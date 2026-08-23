@@ -10,7 +10,6 @@
     "check:02": "node --test --test-name-pattern=\"^02 \" test/problems.test.js",
     "check:03": "node --test --test-name-pattern=\"^03 \" test/problems.test.js",
     "check:04": "node --test --test-name-pattern=\"^04 \" test/problems.test.js",
-    "check:05": "node --test --test-name-pattern=\"^05 \" test/problems.test.js",
     "check:06": "node --test --test-name-pattern=\"^06 \" test/problems.test.js",
     "check:07": "node --test --test-name-pattern=\"^07 \" test/problems.test.js",
     "check:08": "node --test --test-name-pattern=\"^08 \" test/problems.test.js",
@@ -40,7 +39,6 @@
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "eslint": "10.8.1",
-    "nodemon": "^3.1.14",
     "prettier": "3.9.6",
     "prisma": "7.9.1"
   }

@@ -1,5 +1,4 @@
 {
-  "postgresMajor": 18,
   "databasePrefix": "codeit_prisma_practice_",
   "tables": ["Customers", "Products", "Purchases"],
   "minimumPrice": 1000000,

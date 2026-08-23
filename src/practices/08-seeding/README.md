@@ -2,7 +2,7 @@
 
 ## 문제와 시작 상태
 
-Prisma 7 Client와 PostgreSQL용 fixture로 사용자 5명과 각 사용자의 게시글을 관계 순서에 맞게 생성합니다. `NODE_ENV=development`와 삭제 가능한 로컬 데이터베이스인지 확인하는 검사, Post→User 초기화 코드는 제공되어 있습니다. 학생은 이 코드를 변경하지 않고 `User 생성 → ID 조회 → Post.authorId 연결 → Post 생성` 부분을 구현합니다.
+Prisma Client와 PostgreSQL용 fixture로 사용자 5명과 각 사용자의 게시글을 관계 순서에 맞게 생성합니다. `NODE_ENV=development`와 삭제 가능한 로컬 데이터베이스인지 확인하는 검사, Post→User 초기화 코드는 제공되어 있습니다. 학생은 이 코드를 변경하지 않고 `User 생성 → ID 조회 → Post.authorId 연결 → Post 생성` 부분을 구현합니다.
 
 ## 수정 파일과 fixture
 

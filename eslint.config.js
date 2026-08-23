@@ -19,10 +19,4 @@ export default [
       'no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
     },
   },
-  {
-    ignores: [
-      'node_modules/**',
-      'src/practices/05-prisma-project-setup/**/workspace/**',
-    ],
-  },
 ];

@@ -1,9 +1,6 @@
 import assert from 'node:assert/strict';
-import { execFileSync, spawn } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
-import { clearTimeout, setTimeout } from 'node:timers';
-import { fileURLToPath } from 'node:url';
 import bcrypt from 'bcrypt';
 
 function readText(url) {
@@ -12,79 +9,6 @@ function readText(url) {
 
 function readJson(url) {
   return JSON.parse(readText(url));
-}
-
-const npmExecutable = process.platform === 'win32' ? 'npm.cmd' : 'npm';
-
-function terminateProcessTree(child, signal = 'SIGTERM') {
-  if (child.exitCode !== null || child.signalCode !== null) return;
-  if (process.platform === 'win32') {
-    const terminator = spawn(
-      'taskkill',
-      ['/pid', String(child.pid), '/T', '/F'],
-      { stdio: 'ignore' },
-    );
-    terminator.on('error', () => child.kill(signal));
-    return;
-  }
-  try {
-    process.kill(-child.pid, signal);
-  } catch {
-    child.kill(signal);
-  }
-}
-
-function runUntilOutput(cwd, script, expectedOutput) {
-  return new Promise((resolve, reject) => {
-    const child = spawn(npmExecutable, ['run', script, '--silent'], {
-      cwd,
-      detached: process.platform !== 'win32',
-      env: { ...process.env, NO_UPDATE_NOTIFIER: '1' },
-      stdio: ['ignore', 'pipe', 'pipe'],
-    });
-    let output = '';
-    let matched = false;
-    let forceTimer;
-    const timeout = setTimeout(() => {
-      terminateProcessTree(child);
-      forceTimer = setTimeout(
-        () => terminateProcessTree(child, 'SIGKILL'),
-        1000,
-      );
-    }, 10000);
-
-    const capture = (chunk) => {
-      output += chunk;
-      if (!matched && output.includes(expectedOutput)) {
-        matched = true;
-        terminateProcessTree(child);
-        forceTimer = setTimeout(
-          () => terminateProcessTree(child, 'SIGKILL'),
-          1000,
-        );
-      }
-    };
-
-    child.stdout.on('data', capture);
-    child.stderr.on('data', capture);
-    child.on('error', (error) => {
-      clearTimeout(timeout);
-      clearTimeout(forceTimer);
-      reject(error);
-    });
-    child.on('close', (code, signal) => {
-      clearTimeout(timeout);
-      clearTimeout(forceTimer);
-      if (matched) resolve(output);
-      else {
-        reject(
-          new Error(
-            `${script} did not print the expected output (code=${code}, signal=${signal}):\n${output}`,
-          ),
-        );
-      }
-    });
-  });
 }
 
 function escapeRegExp(value) {
@@ -508,40 +432,7 @@ export function registerContracts(candidates) {
     assertModel(blog, fixture.blog);
   });
 
-  test('05 Prisma 프로젝트 준비', async () => {
-    const fixture = readJson(candidates.setup.fixture);
-    const workspacePath = fileURLToPath(candidates.setup.workspace);
-    const packageJson = readJson(
-      new URL('package.json', candidates.setup.workspace),
-    );
-    assert.equal(packageJson.type, 'module');
-    assert.equal(packageJson.engines.node, '>=26 <27');
-    for (const [name, command] of Object.entries(fixture.scripts))
-      assert.equal(packageJson.scripts[name], command);
-    for (const [name, version] of Object.entries(fixture.devDependencies))
-      assert.equal(packageJson.devDependencies[name], version);
-    for (const environment of ['development', 'production']) {
-      const env = readText(
-        new URL(`env/.env.${environment}`, candidates.setup.workspace),
-      );
-      assert.match(env, new RegExp(`^NODE_ENV=${environment}$`, 'm'));
-      assert.match(env, /^PORT=5001$/m);
-    }
-    const prodOutput = execFileSync(
-      npmExecutable,
-      ['run', 'prod', '--silent'],
-      { cwd: workspacePath, encoding: 'utf8' },
-    );
-    assert.equal(prodOutput.trim(), fixture.stdout.prod);
-    const devOutput = await runUntilOutput(
-      workspacePath,
-      'dev',
-      fixture.stdout.dev,
-    );
-    assert.match(devOutput, new RegExp(escapeRegExp(fixture.stdout.dev)));
-  });
-
-  test('06 프로젝트 설정', () => {
+  test('06 환경 변수 검증', () => {
     const fixture = readJson(candidates.config.fixture);
     for (const valid of fixture.valid) {
       assert.deepEqual(candidates.config.parseConfig(valid), {

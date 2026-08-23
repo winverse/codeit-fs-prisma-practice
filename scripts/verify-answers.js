@@ -34,10 +34,6 @@ registerContracts({
     blog: practice('04-practical-modeling/answers/blog-diagram.mmd'),
     fixture: practice('04-practical-modeling/fixtures/constraints.json'),
   },
-  setup: {
-    workspace: practice('05-prisma-project-setup/answers/workspace/'),
-    fixture: practice('05-prisma-project-setup/fixtures/expected.json'),
-  },
   config: {
     parseConfig,
     fixture: practice('06-project-config/fixtures/environments.json'),

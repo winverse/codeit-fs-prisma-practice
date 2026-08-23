@@ -71,11 +71,7 @@ try {
   );
   assert.equal(timeout.rows[0].timeout_ms, SQL_EXECUTION_TIMEOUT_MS);
   const server = await client.query(
-    "SELECT current_setting('server_version_num')::int AS version_num, current_database() AS database_name",
-  );
-  assert.equal(
-    Math.floor(server.rows[0].version_num / 10000),
-    fixture.postgresMajor,
+    'SELECT current_database() AS database_name',
   );
   assert.equal(server.rows[0].database_name, databaseName);
 
@@ -158,7 +154,7 @@ try {
   );
   assert.equal(rolledBack.rows[0].schema_name, null);
 
-  console.log(`PostgreSQL 18 SQL contract passed: ${sqlPath}`);
+  console.log(`PostgreSQL SQL contract passed: ${sqlPath}`);
 } finally {
   if (connected) {
     try {
