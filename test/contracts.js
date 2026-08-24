@@ -376,52 +376,7 @@ export function registerContracts(candidates) {
     }
   });
 
-  test('07 트랜잭션', async () => {
-    const fixture = readJson(candidates.transactions.fixture);
-    const prisma = createTransactionPrisma();
-    const service = candidates.transactions.createPostTransactions(prisma);
-    const created = await service.createPostWithComment(
-      fixture.post,
-      fixture.comment,
-    );
-    assert.deepEqual(prisma.transactions, ['callback']);
-    assert.deepEqual(prisma.operations.slice(-2), [
-      { scope: 'transaction', method: 'post.create' },
-      { scope: 'transaction', method: 'comment.create' },
-    ]);
-    assert.equal(prisma.state.posts.length, 1);
-    assert.equal(prisma.state.comments[0].postId, created.id);
-    await assert.rejects(() =>
-      service.createPostWithComment(fixture.post, fixture.failingComment),
-    );
-    assert.deepEqual(prisma.transactions, ['callback', 'callback']);
-    assert.equal(prisma.state.posts.length, 1);
-    assert.equal(prisma.state.comments.length, 1);
-    const deleted = await service.deletePostWithComments(created.id);
-    assert.deepEqual(prisma.transactions, ['callback', 'callback', 'callback']);
-    assert.deepEqual(prisma.operations.slice(-2), [
-      { scope: 'transaction', method: 'comment.deleteMany' },
-      { scope: 'transaction', method: 'post.delete' },
-    ]);
-    assert.equal(deleted.deletedCommentsCount, 1);
-    assert.equal(deleted.deletedPost.id, created.id);
-    assert.deepEqual(prisma.state, { posts: [], comments: [] });
-
-    prisma.state.posts.push({ id: fixture.failingDeleteId, ...fixture.post });
-    prisma.state.comments.push({
-      id: 1,
-      postId: fixture.failingDeleteId,
-      ...fixture.comment,
-    });
-    const beforeFailedDelete = structuredClone(prisma.state);
-    await assert.rejects(() =>
-      service.deletePostWithComments(fixture.failingDeleteId),
-    );
-    assert.deepEqual(prisma.state, beforeFailedDelete);
-    assert.equal(prisma.transactions.length, 4);
-  });
-
-  test('08 인증 유틸리티와 미들웨어', async () => {
+  test('07 인증 유틸리티와 미들웨어', async () => {
     const fixture = readJson(candidates.auth.fixture);
     const packageJson = readJson(new URL('../package.json', import.meta.url));
     assert.equal(packageJson.dependencies.bcrypt, '6.0.0');
@@ -776,7 +731,7 @@ export function registerContracts(candidates) {
     assert.deepEqual(mismatched.lookups, [fixture.user.id]);
   });
 
-  test('09 유효성 검사', () => {
+  test('08 유효성 검사', () => {
     const fixture = readJson(candidates.validation.fixture);
     assert.equal(
       candidates.validation.signupSchema.safeParse(fixture.validSignup).success,
@@ -862,7 +817,7 @@ export function registerContracts(candidates) {
     assert.deepEqual(signupWithUnknownField.data, fixture.validSignup);
   });
 
-  test('10 Prisma 오류와 ID 검증', () => {
+  test('09 Prisma 오류와 ID 검증', () => {
     const fixture = readJson(candidates.errors.fixture);
     for (const { name, label } of fixture.params) {
       for (const value of fixture.valid) {
@@ -915,5 +870,50 @@ export function registerContracts(candidates) {
       candidates.errors.mapPrismaError(unexpectedError),
       unexpectedError,
     );
+  });
+
+  test('10 트랜잭션', async () => {
+    const fixture = readJson(candidates.transactions.fixture);
+    const prisma = createTransactionPrisma();
+    const service = candidates.transactions.createPostTransactions(prisma);
+    const created = await service.createPostWithComment(
+      fixture.post,
+      fixture.comment,
+    );
+    assert.deepEqual(prisma.transactions, ['callback']);
+    assert.deepEqual(prisma.operations.slice(-2), [
+      { scope: 'transaction', method: 'post.create' },
+      { scope: 'transaction', method: 'comment.create' },
+    ]);
+    assert.equal(prisma.state.posts.length, 1);
+    assert.equal(prisma.state.comments[0].postId, created.id);
+    await assert.rejects(() =>
+      service.createPostWithComment(fixture.post, fixture.failingComment),
+    );
+    assert.deepEqual(prisma.transactions, ['callback', 'callback']);
+    assert.equal(prisma.state.posts.length, 1);
+    assert.equal(prisma.state.comments.length, 1);
+    const deleted = await service.deletePostWithComments(created.id);
+    assert.deepEqual(prisma.transactions, ['callback', 'callback', 'callback']);
+    assert.deepEqual(prisma.operations.slice(-2), [
+      { scope: 'transaction', method: 'comment.deleteMany' },
+      { scope: 'transaction', method: 'post.delete' },
+    ]);
+    assert.equal(deleted.deletedCommentsCount, 1);
+    assert.equal(deleted.deletedPost.id, created.id);
+    assert.deepEqual(prisma.state, { posts: [], comments: [] });
+
+    prisma.state.posts.push({ id: fixture.failingDeleteId, ...fixture.post });
+    prisma.state.comments.push({
+      id: 1,
+      postId: fixture.failingDeleteId,
+      ...fixture.comment,
+    });
+    const beforeFailedDelete = structuredClone(prisma.state);
+    await assert.rejects(() =>
+      service.deletePostWithComments(fixture.failingDeleteId),
+    );
+    assert.deepEqual(prisma.state, beforeFailedDelete);
+    assert.equal(prisma.transactions.length, 4);
   });
 }

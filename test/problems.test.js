@@ -7,10 +7,10 @@ import {
 import { createUserRepository } from '../src/practices/04-crud/src/userRepository.js';
 import { createRelationRepository } from '../src/practices/05-relation-queries/src/relationRepository.js';
 import { buildPostQuery } from '../src/practices/06-advanced-queries/src/postQuery.js';
-import { createPostTransactions } from '../src/practices/07-transactions/src/postTransactions.js';
-import * as auth from '../src/practices/08-auth/src/auth.js';
-import * as validation from '../src/practices/09-validation/src/schemas.js';
-import * as errors from '../src/practices/10-error-refactor/src/errors.js';
+import * as auth from '../src/practices/07-auth/src/auth.js';
+import * as validation from '../src/practices/08-validation/src/schemas.js';
+import * as errors from '../src/practices/09-error-refactor/src/errors.js';
+import { createPostTransactions } from '../src/practices/10-transactions/src/postTransactions.js';
 
 const practice = (path) => new URL(`../src/practices/${path}`, import.meta.url);
 
@@ -40,17 +40,17 @@ registerContracts({
     buildPostQuery,
     fixture: practice('06-advanced-queries/fixtures/query.json'),
   },
-  transactions: {
-    createPostTransactions,
-    fixture: practice('07-transactions/fixtures/operations.json'),
-  },
-  auth: { ...auth, fixture: practice('08-auth/fixtures/auth.json') },
+  auth: { ...auth, fixture: practice('07-auth/fixtures/auth.json') },
   validation: {
     ...validation,
-    fixture: practice('09-validation/fixtures/cases.json'),
+    fixture: practice('08-validation/fixtures/cases.json'),
   },
   errors: {
     ...errors,
-    fixture: practice('10-error-refactor/fixtures/ids.json'),
+    fixture: practice('09-error-refactor/fixtures/ids.json'),
+  },
+  transactions: {
+    createPostTransactions,
+    fixture: practice('10-transactions/fixtures/operations.json'),
   },
 });

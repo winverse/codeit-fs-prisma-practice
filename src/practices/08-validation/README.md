@@ -11,7 +11,7 @@
 
 ## 실행 진입점
 
-`npm run check:09`
+`npm run check:08`
 
 ## 성공·실패 기준
 
