@@ -106,15 +106,11 @@ export function authenticate(secrets, { findUserById, secure = false } = {}) {
     }
 
     const accessPayload = verifyToken(accessToken, 'access', secrets);
-    if (!accessPayload) {
+    if (!accessPayload || !Number.isInteger(accessPayload.userId)) {
       throw new UnauthorizedException('Invalid access token');
     }
 
-    const user = await findUserById(accessPayload.userId);
-    if (!user) {
-      throw new UnauthorizedException('User not found');
-    }
-    req.user = toPublicUser(user);
+    req.user = { id: accessPayload.userId };
 
     const expiresIn = accessPayload.exp - Math.floor(Date.now() / 1000);
     if (expiresIn > 0 && expiresIn < REFRESH_BEFORE_SECONDS && refreshToken) {
@@ -131,10 +127,4 @@ export function authenticate(secrets, { findUserById, secure = false } = {}) {
 
     return next();
   };
-}
-
-export function toPublicUser(user) {
-  const publicUser = { ...user };
-  delete publicUser.password;
-  return publicUser;
 }

@@ -50,11 +50,6 @@ export function setAuthCookies(_res, _tokens, _options) {
 }
 
 export function authenticate(_secrets, _options = {}) {
-  // TODO: Access Token 검증, 사용자 재조회, 공개 사용자 저장, 만료 임박 토큰 갱신을 수행하는 미들웨어를 반환하세요.
+  // TODO: Access Token 검증, 최소 사용자 저장, 만료 임박 토큰 갱신을 수행하는 미들웨어를 반환하세요.
   return (_req, _res, next) => next();
-}
-
-export function toPublicUser(user) {
-  // TODO: 원본 사용자를 변경하지 않고 password를 제외한 사용자 객체를 반환하세요.
-  return user;
 }
