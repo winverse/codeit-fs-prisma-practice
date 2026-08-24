@@ -31,25 +31,9 @@ export function buildPostQuery(input) {
     }
   }
 
-  if (input.authorId !== undefined) {
-    where.authorId = parseInteger(input.authorId, {
-      min: 1,
-      name: 'authorId',
-    });
-  }
-
-  const sortBy = input.sortBy ?? 'createdAt';
-  if (!['createdAt', 'title', 'published'].includes(sortBy)) {
-    throw new RangeError('sortBy is not allowed');
-  }
-  const order = input.order ?? 'desc';
-  if (!['asc', 'desc'].includes(order)) {
-    throw new RangeError('order is not allowed');
-  }
-
   return {
     where,
-    orderBy: [{ [sortBy]: order }, { id: order }],
+    orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
     skip: (page - 1) * limit,
     take: limit,
   };

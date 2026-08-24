@@ -341,21 +341,21 @@ export function registerContracts(candidates) {
     });
     const custom = candidates.advanced.buildPostQuery({
       published: 'false',
-      authorId: '7',
-      sortBy: 'title',
-      order: 'asc',
+      page: '3',
+      limit: '20',
     });
-    assert.deepEqual(custom.where, { published: false, authorId: 7 });
-    assert.deepEqual(custom.orderBy, [{ title: 'asc' }, { id: 'asc' }]);
+    assert.deepEqual(custom, {
+      where: { published: false },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      skip: 40,
+      take: 20,
+    });
     for (const invalid of [
       { page: '0' },
       { page: '1.5' },
       { limit: '101' },
       { limit: 'abc' },
       { published: 'yes' },
-      { authorId: '0' },
-      { sortBy: 'email' },
-      { order: 'sideways' },
     ]) {
       assert.throws(() => candidates.advanced.buildPostQuery(invalid));
     }
