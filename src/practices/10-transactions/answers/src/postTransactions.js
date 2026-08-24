@@ -7,14 +7,5 @@ export function createPostTransactions(prisma) {
         return created;
       });
     },
-    deletePostWithComments(postId) {
-      return prisma.$transaction(async (tx) => {
-        const { count: deletedCommentsCount } = await tx.comment.deleteMany({
-          where: { postId },
-        });
-        const deletedPost = await tx.post.delete({ where: { id: postId } });
-        return { deletedPost, deletedCommentsCount };
-      });
-    },
   };
 }

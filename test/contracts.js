@@ -46,13 +46,6 @@ function createTransactionPrisma() {
         state.posts.push(post);
         return post;
       },
-      async delete({ where }) {
-        operations.push({ scope, method: 'post.delete' });
-        if (where.id === 999) throw new Error('Fixture failure');
-        const index = state.posts.findIndex(({ id }) => id === where.id);
-        if (index < 0) throw new Error('Post not found');
-        return state.posts.splice(index, 1)[0];
-      },
       async createMany({ data }) {
         operations.push({ scope, method: 'post.createMany' });
         if (data.some(({ title }) => title === 'FAIL')) {
@@ -71,14 +64,6 @@ function createTransactionPrisma() {
         const comment = { id: state.comments.length + 1, ...data };
         state.comments.push(comment);
         return comment;
-      },
-      async deleteMany({ where }) {
-        operations.push({ scope, method: 'comment.deleteMany' });
-        const before = state.comments.length;
-        state.comments = state.comments.filter(
-          ({ postId }) => postId !== where.postId,
-        );
-        return { count: before - state.comments.length };
       },
     },
   });
@@ -887,33 +872,11 @@ export function registerContracts(candidates) {
     ]);
     assert.equal(prisma.state.posts.length, 1);
     assert.equal(prisma.state.comments[0].postId, created.id);
+    const beforeFailedCreate = structuredClone(prisma.state);
     await assert.rejects(() =>
       service.createPostWithComment(fixture.post, fixture.failingComment),
     );
     assert.deepEqual(prisma.transactions, ['callback', 'callback']);
-    assert.equal(prisma.state.posts.length, 1);
-    assert.equal(prisma.state.comments.length, 1);
-    const deleted = await service.deletePostWithComments(created.id);
-    assert.deepEqual(prisma.transactions, ['callback', 'callback', 'callback']);
-    assert.deepEqual(prisma.operations.slice(-2), [
-      { scope: 'transaction', method: 'comment.deleteMany' },
-      { scope: 'transaction', method: 'post.delete' },
-    ]);
-    assert.equal(deleted.deletedCommentsCount, 1);
-    assert.equal(deleted.deletedPost.id, created.id);
-    assert.deepEqual(prisma.state, { posts: [], comments: [] });
-
-    prisma.state.posts.push({ id: fixture.failingDeleteId, ...fixture.post });
-    prisma.state.comments.push({
-      id: 1,
-      postId: fixture.failingDeleteId,
-      ...fixture.comment,
-    });
-    const beforeFailedDelete = structuredClone(prisma.state);
-    await assert.rejects(() =>
-      service.deletePostWithComments(fixture.failingDeleteId),
-    );
-    assert.deepEqual(prisma.state, beforeFailedDelete);
-    assert.equal(prisma.transactions.length, 4);
+    assert.deepEqual(prisma.state, beforeFailedCreate);
   });
 }

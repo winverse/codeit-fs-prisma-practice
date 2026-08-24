@@ -1,6 +1,5 @@
 {
   "post": { "title": "트랜잭션", "content": "원자성 확인", "authorId": 1 },
   "comment": { "content": "첫 댓글", "authorId": 2 },
-  "failingComment": { "content": "FAIL", "authorId": 999 },
-  "failingDeleteId": 999
+  "failingComment": { "content": "FAIL", "authorId": 999 }
 }
