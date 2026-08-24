@@ -744,7 +744,12 @@ export function registerContracts(candidates) {
         false,
       );
     }
-    for (const password of ['a'.repeat(15), 'a'.repeat(72), '가'.repeat(24)]) {
+    for (const password of [
+      'a'.repeat(15),
+      'a'.repeat(72),
+      '가'.repeat(72),
+      '😀'.repeat(36),
+    ]) {
       assert.equal(
         candidates.validation.signupSchema.safeParse({
           ...fixture.validSignup,
@@ -760,7 +765,7 @@ export function registerContracts(candidates) {
         true,
       );
     }
-    for (const password of ['a'.repeat(73), '가'.repeat(25)]) {
+    for (const password of ['a'.repeat(73), '가'.repeat(73), '😀'.repeat(37)]) {
       assert.equal(
         candidates.validation.signupSchema.safeParse({
           ...fixture.validSignup,
@@ -776,7 +781,7 @@ export function registerContracts(candidates) {
         false,
       );
     }
-    for (const password of ['a'.repeat(14), '😀'.repeat(8)]) {
+    for (const password of ['a'.repeat(14), '가'.repeat(14)]) {
       assert.equal(
         candidates.validation.signupSchema.safeParse({
           ...fixture.validSignup,
@@ -785,13 +790,6 @@ export function registerContracts(candidates) {
         false,
       );
     }
-    assert.equal(
-      candidates.validation.signupSchema.safeParse({
-        ...fixture.validSignup,
-        password: '😀'.repeat(15),
-      }).success,
-      true,
-    );
     const signupWithUnknownField = candidates.validation.signupSchema.safeParse(
       {
         ...fixture.validSignup,
