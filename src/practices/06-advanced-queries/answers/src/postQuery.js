@@ -20,22 +20,6 @@ export function buildPostQuery(input) {
     name: 'limit',
   });
   const where = {};
-  const search = input.search?.trim();
-
-  if (search) {
-    where.OR = [
-      {
-        title: { contains: search, mode: 'insensitive' },
-      },
-      {
-        author: {
-          is: {
-            name: { contains: search, mode: 'insensitive' },
-          },
-        },
-      },
-    ];
-  }
 
   if (input.published !== undefined) {
     if (input.published === 'true' || input.published === true) {

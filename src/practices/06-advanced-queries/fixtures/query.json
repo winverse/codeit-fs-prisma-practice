@@ -1,22 +1,11 @@
 {
   "input": {
-    "search": "prisma",
     "published": "true",
     "page": "2",
     "limit": "5"
   },
   "expected": {
     "where": {
-      "OR": [
-        { "title": { "contains": "prisma", "mode": "insensitive" } },
-        {
-          "author": {
-            "is": {
-              "name": { "contains": "prisma", "mode": "insensitive" }
-            }
-          }
-        }
-      ],
       "published": true
     },
     "orderBy": [{ "createdAt": "desc" }, { "id": "desc" }],

@@ -2,7 +2,7 @@
 
 ## 문제와 시작 상태
 
-누적 API route 전체를 복제하지 않고, Express query string을 Prisma `findMany()` 인수로 바꾸는 경계만 축소한 독립 query-builder 문제입니다. 검색, 공개 여부, 최신순 정렬, 페이지네이션을 Prisma query object로 만드는 `buildPostQuery()`를 구현합니다. 시작 함수는 빈 객체를 반환합니다.
+누적 API route 전체를 복제하지 않고, Express query string을 Prisma `findMany()` 인수로 바꾸는 경계만 축소한 독립 query-builder 문제입니다. 공개 여부, 최신순 정렬, 페이지네이션을 Prisma query object로 만드는 `buildPostQuery()`를 구현합니다. 시작 함수는 빈 객체를 반환합니다.
 
 ## 수정 파일과 fixture
 
@@ -27,4 +27,4 @@
 
 ## 성공·실패 기준
 
-문자열 page·limit·authorId와 published를 올바른 타입으로 변환하고 제목·작성자 이름 검색, 공개·작성자 필터, 안정적인 정렬, skip/take를 정확히 만들면 성공합니다. 변환할 수 없거나 허용 범위를 벗어난 값, 검색·필터·정렬·페이지네이션 구성 누락은 실패합니다.
+문자열 page·limit·authorId와 published를 올바른 타입으로 변환하고 공개·작성자 필터, 안정적인 정렬, skip/take를 정확히 만들면 성공합니다. 변환할 수 없거나 허용 범위를 벗어난 값, 필터·정렬·페이지네이션 구성 누락은 실패합니다.
