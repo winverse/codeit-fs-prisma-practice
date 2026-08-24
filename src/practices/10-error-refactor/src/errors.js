@@ -28,9 +28,11 @@ export class NotFoundException extends HttpException {
 }
 
 export function validateIdParam(_name, _label) {
+  // TODO: 경로 ID를 양의 정수로 검증·변환하고, 실패하면 BadRequestException을 next에 전달하세요.
   return (_req, _res, next) => next();
 }
 
 export function mapPrismaError(error) {
+  // TODO: P2002와 P2025만 알맞은 HTTP 예외로 변환하고, 그 밖의 오류는 그대로 반환하세요.
   return error;
 }
