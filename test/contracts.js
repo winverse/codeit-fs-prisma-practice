@@ -11,48 +11,6 @@ function readJson(url) {
   return JSON.parse(readText(url));
 }
 
-function escapeRegExp(value) {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-function mirrorCardinality(marker) {
-  return {
-    '||': '||',
-    'o|': '|o',
-    '|o': 'o|',
-    'o{': '}o',
-    '}o': 'o{',
-    '|{': '}|',
-    '}|': '|{',
-  }[marker];
-}
-
-function hasMermaidRelation(source, relation) {
-  const [left, edge, right] = relation.split(/\s+/);
-  const [, leftMarker, rightMarker] = edge.match(
-    /^(\|\||o\||\|o|o\{|\}o|\|\{|\}\|)--(\|\||o\||\|o|o\{|\}o|\|\{|\}\|)$/,
-  );
-  const pattern = (from, fromMarker, toMarker, to) =>
-    new RegExp(
-      `\\b${escapeRegExp(from)}\\s+${escapeRegExp(fromMarker)}\\s*--\\s*${escapeRegExp(toMarker)}\\s+${escapeRegExp(to)}\\b`,
-    );
-  return (
-    pattern(left, leftMarker, rightMarker, right).test(source) ||
-    pattern(
-      right,
-      mirrorCardinality(rightMarker),
-      mirrorCardinality(leftMarker),
-      left,
-    ).test(source)
-  );
-}
-
-function mermaidEntityBody(source, entity) {
-  return source.match(
-    new RegExp(`\\b${escapeRegExp(entity)}\\s*\\{([\\s\\S]*?)\\}`),
-  )?.[1];
-}
-
 function tamperJwt(token) {
   const parts = token.split('.');
   const first = parts[1][0];
@@ -150,289 +108,7 @@ function createTransactionPrisma() {
 }
 
 export function registerContracts(candidates) {
-  test('01 SQL 기본 사용법', () => {
-    const expected = readJson(candidates.sql.fixture);
-    const source = readText(candidates.sql.task);
-    assert.equal(candidates.sql.assertAllowedSqlStatements(source), true);
-    assert.equal(
-      candidates.sql.assertAllowedSqlStatements(`
-        CREATE TABLE "Purchases" (
-          "id" SERIAL PRIMARY KEY,
-          "customerId" INTEGER NOT NULL,
-          FOREIGN KEY ("customerId") REFERENCES "Customers"("id")
-        );
-      `),
-      true,
-    );
-    assert.equal(
-      candidates.sql.assertAllowedSqlStatements(`
-        INSERT INTO "Customers" (email, name)
-        VALUES ('course@test.com', '강의 예시');
-        INSERT INTO "Products" (name, price)
-        VALUES ('키보드', 120000);
-        INSERT INTO "Purchases" ("customerId", "productId", quantity)
-        VALUES (1, 1, 1);
-        SELECT * FROM "Products" WHERE price >= 1000000;
-      `),
-      true,
-    );
-    assert.equal(
-      candidates.sql.assertAllowedSqlStatements(`
-        INSERT INTO "Customers" ("email", "name")
-        VALUES ('commit@test.com', 'END;');
-        SELECT * FROM "Products"
-        WHERE "name" = 'COMMIT;' /* outer /* ROLLBACK; */ comment */;
-      `),
-      true,
-    );
-    for (const unsafeSql of [
-      'COMMIT;',
-      '-- comment\nEND;',
-      '/* comment */ ROLLBACK;',
-      'START TRANSACTION;',
-      "PREPARE TRANSACTION 'practice';",
-      'SET search_path TO public; COMMIT;',
-      'CREATE TABLE public."Customers" ("id" INTEGER);',
-      'INSERT INTO public."Customers" ("id") VALUES (1);',
-      'WITH rows AS (SELECT * FROM "Products") SELECT * FROM rows;',
-      'SELECT pg_sleep(10);',
-      "SELECT set_config('search_path', 'public', false);",
-      'SELECT * FROM "Products" FOR UPDATE;',
-      'SELECT * FROM "Products" UNION SELECT * FROM "Products";',
-      'SELECT * INTO "Customers" FROM "Products";',
-      'SELECT * FROM "pg_authid";',
-      'INSERT INTO "Customers" ("email", "name") SELECT "email", "name" FROM "Customers";',
-      'INSERT INTO "Customers" (password) VALUES (\'secret\');',
-      'CREATE TABLE "Customers" ("id" INTEGER) AS SELECT * FROM "Products";',
-      'CREATE TABLE "Customers" ("id" INTEGER, "payload" TEXT);',
-      'SELECT * FROM "Products" AS foo$tag$; COMMIT; SELECT * FROM "Products" AS bar$tag$;',
-      'INSERT INTO "Customers" ("email", "name") VALUES (E\'one\', \'two\');',
-      'INSERT INTO "Customers" ("email", "name") VALUES (\'foo\\\\\', \', \', \'); COMMIT; SELECT 1; --\');',
-      '/* unterminated',
-      Array.from({ length: 17 }, () => 'SELECT * FROM "Products";').join('\n'),
-      ' '.repeat(32 * 1024 + 1),
-      '',
-    ]) {
-      assert.throws(() => candidates.sql.assertAllowedSqlStatements(unsafeSql));
-    }
-    assert.doesNotMatch(source, /\b(?:PRAGMA|sqlite_master|AUTOINCREMENT)\b/i);
-    const normalized = source
-      .replace(/--.*$/gm, ' ')
-      .replace(/\/\*[\s\S]*?\*\//g, ' ')
-      .replaceAll('"', '')
-      .replace(/\s+/g, ' ')
-      .trim();
-    const statements = normalized
-      .split(';')
-      .map((statement) => statement.trim())
-      .filter(Boolean);
-    const tableBodies = new Map();
-    for (const table of expected.tables) {
-      const match = normalized.match(
-        new RegExp(
-          `create\\s+table\\s+${table}\\s*\\(([\\s\\S]*?)\\)\\s*;`,
-          'i',
-        ),
-      );
-      assert.ok(match, `CREATE TABLE ${table} is required`);
-      tableBodies.set(table, match[1]);
-      assert.match(match[1], /\bid\s+serial\b/i);
-      assert.ok(
-        /\bid\s+serial\s+primary\s+key\b/i.test(match[1]) ||
-          /\bprimary\s+key\s*\(\s*id\s*\)/i.test(match[1]),
-        `${table}.id must be a primary key`,
-      );
-    }
-
-    const customers = tableBodies.get('Customers');
-    const products = tableBodies.get('Products');
-    const purchases = tableBodies.get('Purchases');
-    assert.match(customers, /\bemail\s+varchar\(255\)[^,]*\bnot\s+null\b/i);
-    assert.ok(
-      /\bemail\s+varchar\(255\)[^,]*\bunique\b/i.test(customers) ||
-        /\bunique\s*\(\s*email\s*\)/i.test(customers),
-      'Customers.email must be unique',
-    );
-    assert.match(products, /\bprice\s+integer\s+not\s+null\b/i);
-    assert.match(purchases, /\bquantity\s+integer\s+not\s+null\b/i);
-    assert.match(purchases, /\bdefault\s+1\b/i);
-
-    for (const [column, target] of [
-      ['customerId', 'Customers'],
-      ['productId', 'Products'],
-    ]) {
-      assert.match(
-        purchases,
-        new RegExp(`\\b${column}\\s+integer\\s+not\\s+null\\b`, 'i'),
-      );
-      assert.ok(
-        new RegExp(
-          `\\b${column}\\s+integer\\s+not\\s+null[^,]*\\breferences\\s+${target}\\s*\\(\\s*id\\s*\\)`,
-          'i',
-        ).test(purchases) ||
-          new RegExp(
-            `\\bforeign\\s+key\\s*\\(\\s*${column}\\s*\\)\\s+references\\s+${target}\\s*\\(\\s*id\\s*\\)`,
-            'i',
-          ).test(purchases),
-        `${column} must reference ${target}.id`,
-      );
-    }
-
-    for (const table of expected.tables) {
-      assert.ok(
-        statements.some((statement) =>
-          new RegExp(`^insert\\s+into\\s+${table}\\b`, 'i').test(statement),
-        ),
-        `INSERT INTO ${table} is required`,
-      );
-    }
-    assert.ok(
-      statements.some(
-        (statement) =>
-          /^select\b[\s\S]*\bfrom\s+products\b/i.test(statement) &&
-          !/\bwhere\b/i.test(statement),
-      ),
-      'A query for all products is required',
-    );
-    assert.ok(
-      statements.some((statement) =>
-        new RegExp(
-          `^select\\b[\\s\\S]*\\bfrom\\s+products\\b[\\s\\S]*\\bwhere\\s+price\\s*>=\\s*${expected.minimumPrice}\\b`,
-          'i',
-        ).test(statement),
-      ),
-      'The minimum-price product query is required',
-    );
-    assert.ok(
-      statements.some((statement) =>
-        new RegExp(
-          `^select\\b[\\s\\S]*\\bfrom\\s+purchases\\b[\\s\\S]*\\bwhere\\s+customerid\\s*=\\s*${expected.customerId}\\b`,
-          'i',
-        ).test(statement),
-      ),
-      'The customer-purchases query is required',
-    );
-  });
-
-  test('02 요구사항을 바탕으로 ER 모델링하기', () => {
-    const model = readJson(candidates.er.model);
-    const fixture = readJson(candidates.er.fixture);
-    assert.equal(
-      new Set(model.entities.map(({ name }) => name)).size,
-      model.entities.length,
-    );
-    for (const name of fixture.requiredEntities) {
-      const entity = model.entities.find(
-        (candidate) => candidate.name === name,
-      );
-      assert.ok(entity, `${name} entity is required`);
-      for (const attribute of fixture.requiredAttributes[name]) {
-        assert.ok(
-          entity.attributes.includes(attribute),
-          `${name}.${attribute} is required`,
-        );
-      }
-    }
-    assert.equal(
-      new Set(model.relationships.map(({ name }) => name)).size,
-      model.relationships.length,
-    );
-    for (const relationship of fixture.requiredRelationships) {
-      assert.ok(
-        model.relationships.some(
-          ({ name, from, to }) =>
-            name === relationship.name &&
-            from === relationship.from &&
-            to === relationship.to,
-        ),
-        `${relationship.name}: ${relationship.from} -> ${relationship.to} is required`,
-      );
-    }
-  });
-
-  test('03 카디널리티와 Mermaid 사용하기', () => {
-    const source = readText(candidates.cardinality.diagram);
-    const fixture = readJson(candidates.cardinality.fixture);
-    assert.match(source, /^erDiagram/m);
-    for (const relation of fixture.relations)
-      assert.ok(
-        hasMermaidRelation(source, relation),
-        `${relation} is required`,
-      );
-  });
-
-  test('04 실전 데이터 모델링', () => {
-    const fixture = readJson(candidates.modeling.fixture);
-    const assertModel = (source, model) => {
-      assert.match(source, /^erDiagram/m);
-      for (const entity of model.entities) {
-        const body = mermaidEntityBody(source, entity);
-        assert.ok(body, `${entity} entity is required`);
-        assert.match(body, /\bid\s+PK\b/, `${entity}.id PK is required`);
-      }
-      for (const relation of model.relations)
-        assert.ok(
-          hasMermaidRelation(source, relation),
-          `${relation} is required`,
-        );
-      for (const [entity, fields] of Object.entries(model.requiredFields)) {
-        const body = mermaidEntityBody(source, entity);
-        for (const field of fields)
-          assert.match(
-            body,
-            new RegExp(`\\b${escapeRegExp(field)}\\b`),
-            `${entity}.${field} is required`,
-          );
-      }
-      for (const [entity, keyFields] of Object.entries(
-        model.requiredKeyFields ?? {},
-      )) {
-        const body = mermaidEntityBody(source, entity);
-        for (const requirement of keyFields) {
-          const [field, key] = requirement.split(' ');
-          assert.match(
-            body,
-            new RegExp(`\\b${escapeRegExp(field)}\\s+[^\\n]*\\b${key}\\b`),
-            `${entity}.${field} ${key} is required`,
-          );
-        }
-      }
-      for (const qualified of model.uniqueFields) {
-        const [entity, field] = qualified.split('.');
-        assert.match(
-          mermaidEntityBody(source, entity),
-          new RegExp(`\\b${escapeRegExp(field)}\\s+[^\\n]*\\bUK\\b`),
-          `${qualified} must be unique`,
-        );
-      }
-    };
-
-    const movie = readText(candidates.modeling.diagram);
-    assertModel(movie, fixture);
-    for (const constraint of fixture.uniqueConstraints) {
-      const match = constraint.match(/^(\w+)\((\w+),(\w+)\)$/);
-      assert.ok(match);
-      const [, entity, first, second] = match;
-      assert.match(
-        movie,
-        new RegExp(
-          `%%\\s*UNIQUE\\s+${entity}\\s*\\(\\s*${first}\\s*,\\s*${second}\\s*\\)`,
-          'i',
-        ),
-        `${constraint} is required`,
-      );
-    }
-    assert.doesNotMatch(movie, /Screening \|\|--\|\{ Ticket/);
-    assert.doesNotMatch(
-      mermaidEntityBody(movie, 'Seat'),
-      /\bseatNumber\s+[^\n]*\bUK\b/,
-    );
-
-    const blog = readText(candidates.modeling.blog);
-    assertModel(blog, fixture.blog);
-  });
-
-  test('06 환경 변수 검증', () => {
+  test('01 환경 변수 검증', () => {
     const fixture = readJson(candidates.config.fixture);
     for (const valid of fixture.valid) {
       assert.deepEqual(candidates.config.parseConfig(valid), {
@@ -445,7 +121,7 @@ export function registerContracts(candidates) {
     }
   });
 
-  test('07 Prisma 모델과 관계', () => {
+  test('02 Prisma 모델과 관계', () => {
     const source = readText(candidates.schema.schema);
     const fixture = readJson(candidates.schema.fixture);
     for (const model of fixture.models)
@@ -454,7 +130,7 @@ export function registerContracts(candidates) {
       assert.ok(source.includes(token));
   });
 
-  test('08 시딩', async () => {
+  test('03 시딩', async () => {
     const fixture = readJson(candidates.seeding.fixture);
     assert.equal(fixture.users.length, 5);
     assert.ok(fixture.users.every(({ posts }) => posts.length >= 1));
@@ -615,7 +291,7 @@ export function registerContracts(candidates) {
     );
   });
 
-  test('09 CRUD', async () => {
+  test('04 CRUD', async () => {
     const fixture = readJson(candidates.crud.fixture);
     const { calls, delegate } = createRecordingDelegate([
       'create',
@@ -642,7 +318,7 @@ export function registerContracts(candidates) {
     ]);
   });
 
-  test('10 관계 쿼리', async () => {
+  test('05 관계 쿼리', async () => {
     const users = createRecordingDelegate(['findMany']);
     const posts = createRecordingDelegate(['findMany']);
     const repository = candidates.relations.createRelationRepository({
@@ -668,7 +344,7 @@ export function registerContracts(candidates) {
     }
   });
 
-  test('11 고급 쿼리', () => {
+  test('06 고급 쿼리', () => {
     const fixture = readJson(candidates.advanced.fixture);
     const query = candidates.advanced.buildPostQuery(fixture.input);
     assert.deepEqual(query, fixture.expected);
@@ -700,7 +376,7 @@ export function registerContracts(candidates) {
     }
   });
 
-  test('12 트랜잭션', async () => {
+  test('07 트랜잭션', async () => {
     const fixture = readJson(candidates.transactions.fixture);
     const prisma = createTransactionPrisma();
     const service = candidates.transactions.createPostTransactions(prisma);
@@ -745,7 +421,7 @@ export function registerContracts(candidates) {
     assert.equal(prisma.transactions.length, 4);
   });
 
-  test('13 인증 유틸리티와 미들웨어', async () => {
+  test('08 인증 유틸리티와 미들웨어', async () => {
     const fixture = readJson(candidates.auth.fixture);
     const packageJson = readJson(new URL('../package.json', import.meta.url));
     assert.equal(packageJson.dependencies.bcrypt, '6.0.0');
@@ -993,7 +669,7 @@ export function registerContracts(candidates) {
     assert.deepEqual(mismatched.lookups, [fixture.user.id]);
   });
 
-  test('14 유효성 검사', () => {
+  test('09 유효성 검사', () => {
     const fixture = readJson(candidates.validation.fixture);
     assert.equal(
       candidates.validation.signupSchema.safeParse(fixture.validSignup).success,
@@ -1079,7 +755,7 @@ export function registerContracts(candidates) {
     assert.deepEqual(signupWithUnknownField.data, fixture.validSignup);
   });
 
-  test('15 커스텀 에러와 검증 리팩터링', () => {
+  test('10 커스텀 에러와 검증 리팩터링', () => {
     const fixture = readJson(candidates.errors.fixture);
     for (const { name, label } of fixture.params) {
       for (const value of fixture.valid) {

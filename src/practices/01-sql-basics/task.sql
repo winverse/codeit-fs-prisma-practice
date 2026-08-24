@@ -1,1 +1,0 @@
--- TODO: Customers, Products, Purchases 테이블과 fixture 행을 작성하세요.

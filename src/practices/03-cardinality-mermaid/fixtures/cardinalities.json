@@ -1,7 +1,0 @@
-{
-  "relations": [
-    "Department ||--o{ Professor",
-    "Professor ||--o{ Course",
-    "Student }o--o{ Course"
-  ]
-}
