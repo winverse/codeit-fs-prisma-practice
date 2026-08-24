@@ -35,7 +35,7 @@ export function generateRefreshToken(_user, _refreshSecret, _expiresIn = '7d') {
   return '';
 }
 
-export function generateTokens(_user, _secrets, _expiresIn) {
+export function generateTokens(_user, _secrets) {
   // TODO: Access Token과 Refresh Token을 함께 발급해 반환하세요.
   return { accessToken: '', refreshToken: '' };
 }

@@ -20,6 +20,11 @@
       "email": "ada@example.com",
       "password": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       "name": "Ada"
+    },
+    {
+      "email": "ada@example.com",
+      "password": "가가가가가가가가가가가가가가가가가가가가가가가가가",
+      "name": "Ada"
     }
   ],
   "validLogin": {
@@ -31,6 +36,10 @@
     {
       "email": "ada@example.com",
       "password": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    {
+      "email": "ada@example.com",
+      "password": "가가가가가가가가가가가가가가가가가가가가가가가가가"
     }
   ]
 }

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import bcrypt from 'bcrypt';
+import jwt from 'jsonwebtoken';
 
 function readText(url) {
   return readFileSync(url, 'utf8');
@@ -9,6 +10,27 @@ function readText(url) {
 
 function readJson(url) {
   return JSON.parse(readText(url));
+}
+
+function compactPrisma(source) {
+  return source.replace(/\/\/.*$/gm, '').replace(/\s+/g, '');
+}
+
+function readPrismaModel(source, modelName) {
+  const match = source
+    .replace(/\/\/.*$/gm, '')
+    .match(new RegExp(`model\\s+${modelName}\\s*\\{([\\s\\S]*?)\\}`));
+  assert.ok(match, `${modelName} model is required`);
+  return match[1]
+    .split('\n')
+    .map((line) => compactPrisma(line))
+    .filter(Boolean);
+}
+
+function sortRecords(records) {
+  return structuredClone(records).sort((a, b) =>
+    JSON.stringify(a).localeCompare(JSON.stringify(b)),
+  );
 }
 
 function tamperJwt(token) {
@@ -109,10 +131,19 @@ export function registerContracts(candidates) {
   test('02 Prisma 모델과 관계', () => {
     const source = readText(candidates.schema.schema);
     const fixture = readJson(candidates.schema.fixture);
-    for (const model of fixture.models)
-      assert.match(source, new RegExp(`model ${model} \\{`));
-    for (const token of fixture.requiredTokens)
-      assert.ok(source.includes(token));
+    const compactSource = compactPrisma(source);
+    for (const token of fixture.requiredTokens) {
+      assert.ok(compactSource.includes(compactPrisma(token)));
+    }
+    for (const [modelName, fields] of Object.entries(fixture.models)) {
+      const modelFields = readPrismaModel(source, modelName);
+      for (const field of fields) {
+        assert.ok(
+          modelFields.includes(compactPrisma(field)),
+          `${modelName}.${field.split(' ')[0]} is required`,
+        );
+      }
+    }
   });
 
   test('03 시딩', async () => {
@@ -215,10 +246,12 @@ export function registerContracts(candidates) {
     assert.equal(unsafeMutationCount, 0);
 
     const calls = [];
-    const storedUsers = fixture.users.map(({ email }, index) => ({
-      id: index + 1,
-      email,
-    }));
+    const storedUsers = fixture.users
+      .map(({ email }, index) => ({
+        id: 101 + index * 103,
+        email,
+      }))
+      .reverse();
     const prisma = {
       post: {
         deleteMany() {
@@ -258,21 +291,32 @@ export function registerContracts(candidates) {
     const userCreate = calls.find((call) => call.userCreateMany);
     const userFind = calls.find((call) => call.userFindMany);
     const postCreate = calls.find((call) => call.postCreateMany);
-    assert.equal(userCreate.userCreateMany.length, fixture.users.length);
+    assert.equal(calls.filter((call) => call.userCreateMany).length, 1);
+    assert.equal(calls.filter((call) => call.userFindMany).length, 1);
+    assert.equal(calls.filter((call) => call.postCreateMany).length, 1);
+    assert.ok(userCreate, 'user.createMany is required');
+    assert.ok(userFind, 'user.findMany is required');
+    assert.ok(postCreate, 'post.createMany is required');
+    const expectedUsers = fixture.users.map(
+      ({ posts: _posts, ...user }) => user,
+    );
+    assert.deepEqual(
+      sortRecords(userCreate.userCreateMany),
+      sortRecords(expectedUsers),
+    );
     assert.deepEqual(userFind.userFindMany, {
       where: {
         email: { in: fixture.users.map(({ email }) => email) },
       },
       select: { id: true, email: true },
     });
-    assert.equal(
-      postCreate.postCreateMany.length,
-      fixture.users.reduce((count, { posts }) => count + posts.length, 0),
+    const idsByEmail = new Map(storedUsers.map(({ email, id }) => [email, id]));
+    const expectedPosts = fixture.users.flatMap(({ email, posts }) =>
+      posts.map((post) => ({ ...post, authorId: idsByEmail.get(email) })),
     );
-    assert.ok(
-      postCreate.postCreateMany.every(({ authorId }) =>
-        storedUsers.some(({ id }) => id === authorId),
-      ),
+    assert.deepEqual(
+      sortRecords(postCreate.postCreateMany),
+      sortRecords(expectedPosts),
     );
   });
 
@@ -286,12 +330,14 @@ export function registerContracts(candidates) {
       'delete',
     ]);
     const repository = candidates.crud.createUserRepository({ user: delegate });
-    await repository.create(fixture.create);
-    await repository.findAll();
-    await repository.findById(fixture.id);
-    await repository.update(fixture.id, fixture.update);
-    await repository.remove(fixture.id);
-    assert.deepEqual(calls, [
+    const results = [
+      await repository.create(fixture.create),
+      await repository.findAll(),
+      await repository.findById(fixture.id),
+      await repository.update(fixture.id, fixture.update),
+      await repository.remove(fixture.id),
+    ];
+    const expectedCalls = [
       { method: 'create', args: { data: fixture.create } },
       { method: 'findMany', args: undefined },
       { method: 'findUnique', args: { where: { id: Number(fixture.id) } } },
@@ -300,7 +346,9 @@ export function registerContracts(candidates) {
         args: { where: { id: Number(fixture.id) }, data: fixture.update },
       },
       { method: 'delete', args: { where: { id: Number(fixture.id) } } },
-    ]);
+    ];
+    assert.deepEqual(calls, expectedCalls);
+    assert.deepEqual(results, expectedCalls);
   });
 
   test('05 관계 쿼리', async () => {
@@ -310,35 +358,115 @@ export function registerContracts(candidates) {
       user: users.delegate,
       post: posts.delegate,
     });
-    await repository.findUsersWithPosts();
-    await repository.findPostsWithAuthors();
+    const usersResult = await repository.findUsersWithPosts();
+    const postsResult = await repository.findPostsWithAuthors();
     assert.equal(users.calls.length, 1);
     assert.equal(posts.calls.length, 1);
-    const postsRelation =
-      users.calls[0].args.include?.posts ?? users.calls[0].args.select?.posts;
-    assert.ok(postsRelation, 'posts relation is required');
+    const usersArgs = users.calls[0].args;
+    const postsArgs = posts.calls[0].args;
+    assert.equal(
+      Number(Boolean(usersArgs.include)) + Number(Boolean(usersArgs.select)),
+      1,
+    );
+    assert.equal(
+      Number(Boolean(postsArgs.include)) + Number(Boolean(postsArgs.select)),
+      1,
+    );
+    const postsRelation = usersArgs.include?.posts ?? usersArgs.select?.posts;
+    assert.ok(
+      postsRelation === true ||
+        (typeof postsRelation === 'object' &&
+          postsRelation !== null &&
+          !Array.isArray(postsRelation)),
+      'posts relation must use a valid Prisma relation option',
+    );
+    if (postsRelation !== true) {
+      assert.deepEqual(Object.keys(postsRelation), ['select']);
+      assert.ok(
+        typeof postsRelation.select === 'object' &&
+          postsRelation.select !== null &&
+          !Array.isArray(postsRelation.select),
+      );
+      assert.ok(Object.keys(postsRelation.select).length > 0);
+      const postFields = new Set([
+        'id',
+        'title',
+        'content',
+        'published',
+        'authorId',
+        'author',
+        'createdAt',
+        'updatedAt',
+      ]);
+      assert.ok(
+        Object.keys(postsRelation.select).every((field) =>
+          postFields.has(field),
+        ),
+      );
+      assert.ok(
+        Object.values(postsRelation.select).every((value) => value === true),
+      );
+    }
     const authorRelation =
-      posts.calls[0].args.include?.author ?? posts.calls[0].args.select?.author;
+      postsArgs.include?.author ?? postsArgs.select?.author;
     assert.ok(authorRelation, 'author relation is required');
     if (authorRelation !== true) {
-      assert.deepEqual(authorRelation.select, {
-        id: true,
-        email: true,
-        name: true,
-      });
+      assert.deepEqual(Object.keys(authorRelation), ['select']);
+      const userFields = new Set([
+        'id',
+        'email',
+        'name',
+        'posts',
+        'createdAt',
+        'updatedAt',
+      ]);
+      assert.ok(
+        Object.keys(authorRelation.select).every((field) =>
+          userFields.has(field),
+        ),
+      );
+      assert.ok(
+        Object.values(authorRelation.select).every((value) => value === true),
+      );
+      for (const field of ['id', 'email', 'name']) {
+        assert.equal(authorRelation.select[field], true);
+      }
     }
+    assert.deepEqual(usersResult, { method: 'findMany', args: usersArgs });
+    assert.deepEqual(postsResult, { method: 'findMany', args: postsArgs });
   });
 
   test('06 고급 쿼리', () => {
     const fixture = readJson(candidates.advanced.fixture);
     const query = candidates.advanced.buildPostQuery(fixture.input);
     assert.deepEqual(query, fixture.expected);
-    assert.deepEqual(candidates.advanced.buildPostQuery({}), {
-      where: {},
-      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+    const assertUnfilteredQuery = (actual, { skip, take }) => {
+      const { where, ...queryWithoutWhere } = actual;
+      assert.ok(
+        where === undefined ||
+          (typeof where === 'object' &&
+            where !== null &&
+            !Array.isArray(where) &&
+            Object.keys(where).length === 0),
+      );
+      assert.deepEqual(queryWithoutWhere, {
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        skip,
+        take,
+      });
+    };
+    assertUnfilteredQuery(candidates.advanced.buildPostQuery({}), {
       skip: 0,
       take: 10,
     });
+    assertUnfilteredQuery(
+      candidates.advanced.buildPostQuery({ page: '1', limit: '1' }),
+      { skip: 0, take: 1 },
+    );
+    assertUnfilteredQuery(
+      candidates.advanced.buildPostQuery({ page: '1', limit: '100' }),
+      { skip: 0, take: 100 },
+    );
     const custom = candidates.advanced.buildPostQuery({
       published: 'false',
       page: '3',
@@ -352,7 +480,12 @@ export function registerContracts(candidates) {
     });
     for (const invalid of [
       { page: '0' },
+      { page: '-1' },
       { page: '1.5' },
+      { page: 'abc' },
+      { limit: '0' },
+      { limit: '-1' },
+      { limit: '1.5' },
       { limit: '101' },
       { limit: 'abc' },
       { published: 'yes' },
@@ -389,8 +522,21 @@ export function registerContracts(candidates) {
     const tokens = candidates.auth.generateTokens(
       fixture.user,
       fixture.secrets,
-      { access: '1h', refresh: '2h' },
     );
+    assert.equal(
+      jwt.decode(tokens.accessToken, { complete: true }).header.alg,
+      'HS256',
+    );
+    assert.equal(
+      jwt.decode(tokens.refreshToken, { complete: true }).header.alg,
+      'HS256',
+    );
+    jwt.verify(tokens.accessToken, fixture.secrets.access, {
+      algorithms: ['HS256'],
+    });
+    jwt.verify(tokens.refreshToken, fixture.secrets.refresh, {
+      algorithms: ['HS256'],
+    });
     const accessPayload = candidates.auth.verifyToken(
       tokens.accessToken,
       'access',
@@ -403,6 +549,35 @@ export function registerContracts(candidates) {
     );
     assert.equal(accessPayload.userId, fixture.user.id);
     assert.equal(refreshPayload.userId, fixture.user.id);
+    assert.equal(
+      accessPayload.exp - accessPayload.iat,
+      fixture.cookie.accessMaxAge / 1000,
+    );
+    assert.equal(
+      refreshPayload.exp - refreshPayload.iat,
+      fixture.cookie.refreshMaxAge / 1000,
+    );
+    const defaultAccessPayload = candidates.auth.verifyToken(
+      candidates.auth.generateAccessToken(fixture.user, fixture.secrets.access),
+      'access',
+      fixture.secrets,
+    );
+    const defaultRefreshPayload = candidates.auth.verifyToken(
+      candidates.auth.generateRefreshToken(
+        fixture.user,
+        fixture.secrets.refresh,
+      ),
+      'refresh',
+      fixture.secrets,
+    );
+    assert.equal(
+      defaultAccessPayload.exp - defaultAccessPayload.iat,
+      fixture.cookie.accessMaxAge / 1000,
+    );
+    assert.equal(
+      defaultRefreshPayload.exp - defaultRefreshPayload.iat,
+      fixture.cookie.refreshMaxAge / 1000,
+    );
     const customClaims = (payload) =>
       Object.keys(payload)
         .filter((key) => !['iat', 'exp'].includes(key))
@@ -412,6 +587,28 @@ export function registerContracts(candidates) {
     assert.equal(
       candidates.auth.verifyToken(
         tokens.accessToken,
+        'refresh',
+        fixture.secrets,
+      ),
+      null,
+    );
+    const hs512AccessToken = jwt.sign(
+      { userId: fixture.user.id },
+      fixture.secrets.access,
+      { algorithm: 'HS512', expiresIn: '1h' },
+    );
+    assert.equal(
+      candidates.auth.verifyToken(hs512AccessToken, 'access', fixture.secrets),
+      null,
+    );
+    const hs512RefreshToken = jwt.sign(
+      { userId: fixture.user.id },
+      fixture.secrets.refresh,
+      { algorithm: 'HS512', expiresIn: '2h' },
+    );
+    assert.equal(
+      candidates.auth.verifyToken(
+        hs512RefreshToken,
         'refresh',
         fixture.secrets,
       ),
@@ -436,11 +633,18 @@ export function registerContracts(candidates) {
 
     const tamperedAccess = tamperJwt(tokens.accessToken);
     const tamperedRefresh = tamperJwt(tokens.refreshToken);
-    const expiredTokens = candidates.auth.generateTokens(
-      fixture.user,
-      fixture.secrets,
-      { access: -1, refresh: -1 },
-    );
+    const expiredTokens = {
+      accessToken: candidates.auth.generateAccessToken(
+        fixture.user,
+        fixture.secrets.access,
+        -1,
+      ),
+      refreshToken: candidates.auth.generateRefreshToken(
+        fixture.user,
+        fixture.secrets.refresh,
+        -1,
+      ),
+    };
     assert.equal(
       candidates.auth.verifyToken(undefined, 'access', fixture.secrets),
       null,
@@ -489,7 +693,7 @@ export function registerContracts(candidates) {
       sameSite: 'lax',
       path: '/',
     };
-    assert.deepEqual(cookieCalls, [
+    const expectedCookieCalls = [
       {
         name: 'accessToken',
         value: tokens.accessToken,
@@ -506,12 +710,36 @@ export function registerContracts(candidates) {
           maxAge: fixture.cookie.refreshMaxAge,
         },
       },
-    ]);
+    ];
+    assert.deepEqual(
+      sortRecords(cookieCalls),
+      sortRecords(expectedCookieCalls),
+    );
+    const insecureCookieCalls = [];
+    candidates.auth.setAuthCookies(
+      {
+        cookie(name, value, options) {
+          insecureCookieCalls.push({ name, value, options });
+        },
+      },
+      tokens,
+      { secure: false },
+    );
+    assert.deepEqual(
+      sortRecords(insecureCookieCalls),
+      sortRecords(
+        expectedCookieCalls.map((call) => ({
+          ...call,
+          options: { ...call.options, secure: false },
+        })),
+      ),
+    );
 
     const databaseUser = { ...fixture.user, name: 'Ada from database' };
     const runAuthentication = ({
       accessToken,
       refreshToken,
+      secure = fixture.cookie.secure,
       findUserById = async (userId) =>
         userId === fixture.user.id ? databaseUser : null,
     }) => {
@@ -543,7 +771,7 @@ export function registerContracts(candidates) {
         },
       };
       const middleware = candidates.auth.authenticate(fixture.secrets, {
-        secure: fixture.cookie.secure,
+        secure,
         async findUserById(userId) {
           lookups.push(userId);
           return findUserById(userId);
@@ -630,11 +858,18 @@ export function registerContracts(candidates) {
     assert.equal(databaseIsSkipped.nextCalled, true);
     assert.deepEqual(databaseIsSkipped.lookups, []);
 
-    const nearExpiry = candidates.auth.generateTokens(
-      fixture.user,
-      fixture.secrets,
-      { access: '4m', refresh: '2h' },
-    );
+    const nearExpiry = {
+      accessToken: candidates.auth.generateAccessToken(
+        fixture.user,
+        fixture.secrets.access,
+        '4m',
+      ),
+      refreshToken: candidates.auth.generateRefreshToken(
+        fixture.user,
+        fixture.secrets.refresh,
+        '2h',
+      ),
+    };
     const withoutRefresh = runAuthentication({
       accessToken: nearExpiry.accessToken,
     });
@@ -642,6 +877,37 @@ export function registerContracts(candidates) {
     assert.equal(withoutRefresh.nextCalled, true);
     assert.equal(withoutRefresh.cookieCalls.length, 0);
     assert.deepEqual(withoutRefresh.lookups, []);
+
+    const fixedNow = 1_800_000_000_000;
+    const exactFiveMinutes = {
+      accessToken: jwt.sign(
+        {
+          userId: fixture.user.id,
+          exp: fixedNow / 1000 + 5 * 60,
+        },
+        fixture.secrets.access,
+        { algorithm: 'HS256', noTimestamp: true },
+      ),
+      refreshToken: jwt.sign(
+        {
+          userId: fixture.user.id,
+          exp: fixedNow / 1000 + 2 * 60 * 60,
+        },
+        fixture.secrets.refresh,
+        { algorithm: 'HS256', noTimestamp: true },
+      ),
+    };
+    const originalDateNow = Date.now;
+    Date.now = () => fixedNow;
+    try {
+      const atRefreshBoundary = runAuthentication(exactFiveMinutes);
+      await atRefreshBoundary.completion;
+      assert.equal(atRefreshBoundary.nextCalled, true);
+      assert.deepEqual(atRefreshBoundary.lookups, []);
+      assert.equal(atRefreshBoundary.cookieCalls.length, 0);
+    } finally {
+      Date.now = originalDateNow;
+    }
 
     const refreshed = runAuthentication({
       accessToken: nearExpiry.accessToken,
@@ -651,6 +917,78 @@ export function registerContracts(candidates) {
     assert.equal(refreshed.nextCalled, true);
     assert.equal(refreshed.cookieCalls.length, 2);
     assert.deepEqual(refreshed.lookups, [fixture.user.id]);
+    const refreshedCookies = new Map(
+      refreshed.cookieCalls.map((call) => [call.name, call]),
+    );
+    assert.deepEqual([...refreshedCookies.keys()].sort(), [
+      'accessToken',
+      'refreshToken',
+    ]);
+    assert.notEqual(
+      refreshedCookies.get('accessToken').value,
+      nearExpiry.accessToken,
+    );
+    assert.notEqual(
+      refreshedCookies.get('refreshToken').value,
+      nearExpiry.refreshToken,
+    );
+    assert.ok(
+      refreshed.cookieCalls.every(
+        ({ options }) => options.secure === fixture.cookie.secure,
+      ),
+    );
+    const refreshedAccessPayload = candidates.auth.verifyToken(
+      refreshedCookies.get('accessToken').value,
+      'access',
+      fixture.secrets,
+    );
+    const refreshedRefreshPayload = candidates.auth.verifyToken(
+      refreshedCookies.get('refreshToken').value,
+      'refresh',
+      fixture.secrets,
+    );
+    assert.equal(refreshedAccessPayload.userId, fixture.user.id);
+    assert.equal(refreshedRefreshPayload.userId, fixture.user.id);
+    assert.deepEqual(customClaims(refreshedAccessPayload), ['userId']);
+    assert.deepEqual(customClaims(refreshedRefreshPayload), ['userId']);
+    assert.equal(
+      refreshedAccessPayload.exp - refreshedAccessPayload.iat,
+      fixture.cookie.accessMaxAge / 1000,
+    );
+    assert.equal(
+      refreshedRefreshPayload.exp - refreshedRefreshPayload.iat,
+      fixture.cookie.refreshMaxAge / 1000,
+    );
+
+    const refreshedInsecure = runAuthentication({
+      accessToken: nearExpiry.accessToken,
+      refreshToken: nearExpiry.refreshToken,
+      secure: false,
+    });
+    await refreshedInsecure.completion;
+    assert.equal(refreshedInsecure.nextCalled, true);
+    assert.equal(refreshedInsecure.cookieCalls.length, 2);
+    assert.ok(
+      refreshedInsecure.cookieCalls.every(
+        ({ options }) => options.secure === false,
+      ),
+    );
+    assert.deepEqual(refreshedInsecure.lookups, [fixture.user.id]);
+
+    for (const invalidRefreshToken of [
+      tamperedRefresh,
+      expiredTokens.refreshToken,
+      hs512RefreshToken,
+    ]) {
+      const invalidRefresh = runAuthentication({
+        accessToken: nearExpiry.accessToken,
+        refreshToken: invalidRefreshToken,
+      });
+      await invalidRefresh.completion;
+      assert.equal(invalidRefresh.nextCalled, true);
+      assert.equal(invalidRefresh.cookieCalls.length, 0);
+      assert.deepEqual(invalidRefresh.lookups, []);
+    }
 
     const missingRefreshUser = runAuthentication({
       accessToken: nearExpiry.accessToken,
@@ -683,14 +1021,15 @@ export function registerContracts(candidates) {
     assert.equal(unexpectedRefreshDatabaseFailure.response.statusCalls, 0);
     assert.equal(unexpectedRefreshDatabaseFailure.response.jsonCalls, 0);
 
-    const otherUserTokens = candidates.auth.generateTokens(
-      { ...fixture.user, id: 2 },
-      fixture.secrets,
-      { access: '4m', refresh: '2h' },
+    const otherUser = { ...fixture.user, id: 2 };
+    const otherRefreshToken = candidates.auth.generateRefreshToken(
+      otherUser,
+      fixture.secrets.refresh,
+      '2h',
     );
     const mismatched = runAuthentication({
       accessToken: nearExpiry.accessToken,
-      refreshToken: otherUserTokens.refreshToken,
+      refreshToken: otherRefreshToken,
     });
     await mismatched.completion;
     assert.equal(mismatched.nextCalled, true);
@@ -710,6 +1049,23 @@ export function registerContracts(candidates) {
       candidates.validation.signupSchema.safeParse(signupWithoutName);
     assert.equal(optionalName.success, true);
     assert.deepEqual(optionalName.data, signupWithoutName);
+    for (const name of ['A', '가']) {
+      assert.equal(
+        candidates.validation.signupSchema.safeParse({
+          ...fixture.validSignup,
+          name,
+        }).success,
+        false,
+      );
+    }
+    for (const requiredField of ['email', 'password']) {
+      const missing = { ...fixture.validSignup };
+      delete missing[requiredField];
+      assert.equal(
+        candidates.validation.signupSchema.safeParse(missing).success,
+        false,
+      );
+    }
     for (const invalid of fixture.invalidSignup) {
       assert.equal(
         candidates.validation.signupSchema.safeParse(invalid).success,
@@ -720,6 +1076,21 @@ export function registerContracts(candidates) {
       candidates.validation.loginSchema.safeParse(fixture.validLogin).success,
       true,
     );
+    assert.equal(
+      candidates.validation.loginSchema.safeParse({
+        ...fixture.validLogin,
+        email: 'not-email',
+      }).success,
+      false,
+    );
+    for (const requiredField of ['email', 'password']) {
+      const missing = { ...fixture.validLogin };
+      delete missing[requiredField];
+      assert.equal(
+        candidates.validation.loginSchema.safeParse(missing).success,
+        false,
+      );
+    }
     for (const invalid of fixture.invalidLogin) {
       assert.equal(
         candidates.validation.loginSchema.safeParse(invalid).success,
@@ -729,8 +1100,8 @@ export function registerContracts(candidates) {
     for (const password of [
       'a'.repeat(15),
       'a'.repeat(72),
-      '가'.repeat(72),
-      '😀'.repeat(36),
+      '가'.repeat(24),
+      '😀'.repeat(18),
     ]) {
       assert.equal(
         candidates.validation.signupSchema.safeParse({
@@ -747,7 +1118,7 @@ export function registerContracts(candidates) {
         true,
       );
     }
-    for (const password of ['a'.repeat(73), '가'.repeat(73), '😀'.repeat(37)]) {
+    for (const password of ['a'.repeat(73), '가'.repeat(25), '😀'.repeat(19)]) {
       assert.equal(
         candidates.validation.signupSchema.safeParse({
           ...fixture.validSignup,
@@ -780,6 +1151,12 @@ export function registerContracts(candidates) {
     );
     assert.equal(signupWithUnknownField.success, true);
     assert.deepEqual(signupWithUnknownField.data, fixture.validSignup);
+    const loginWithUnknownField = candidates.validation.loginSchema.safeParse({
+      ...fixture.validLogin,
+      role: 'admin',
+    });
+    assert.equal(loginWithUnknownField.success, true);
+    assert.deepEqual(loginWithUnknownField.data, fixture.validLogin);
   });
 
   test('09 Prisma 오류와 ID 검증', () => {
@@ -850,8 +1227,11 @@ export function registerContracts(candidates) {
       { scope: 'transaction', method: 'post.create' },
       { scope: 'transaction', method: 'comment.create' },
     ]);
+    assert.deepEqual(created, { id: 1, ...fixture.post });
     assert.equal(prisma.state.posts.length, 1);
-    assert.equal(prisma.state.comments[0].postId, created.id);
+    assert.deepEqual(prisma.state.comments, [
+      { id: 1, ...fixture.comment, postId: created.id },
+    ]);
     const beforeFailedCreate = structuredClone(prisma.state);
     await assert.rejects(() =>
       service.createPostWithComment(fixture.post, fixture.failingComment),

@@ -3,7 +3,7 @@ export function createRelationRepository(prisma) {
     findUsersWithPosts() {
       return prisma.user.findMany({
         include: {
-          posts: { orderBy: { createdAt: 'desc' } },
+          posts: true,
         },
       });
     },

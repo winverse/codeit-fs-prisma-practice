@@ -11,7 +11,7 @@
 
 `authenticate(secrets, options)`는 비동기 Express 5 미들웨어를 반환합니다. 1단계에서는 Access Token을 검증하고 payload의 정수형 `userId`로 `{ id: userId }` 형태의 `req.user`를 만듭니다. 이때는 데이터베이스를 조회하지 않습니다. Access Token이 없거나 유효하지 않거나 만료됐거나 `userId`가 정수가 아니면 `statusCode`가 401인 `UnauthorizedException`을 던집니다. 미들웨어가 직접 401·500 응답을 만들지 않으며, 바깥 전체를 감싼 전달용 `try/catch`도 두지 않습니다.
 
-2단계에서는 Access Token과 Refresh Token의 payload에 `userId`만 넣습니다. `comparePassword()`의 bcrypt 오류를 `false`로 바꾸는 catch와 `verifyToken()`의 JWT 오류를 `null`로 바꾸는 catch는 각 유틸리티가 정한 의미 있는 경계이므로 유지합니다. 유효한 Access Token은 Refresh Token이 없어도 정상 통과합니다. 만료까지 5분 미만이고 Refresh Token도 있을 때만 Refresh Token을 검증하며, 두 token의 `userId`가 같고 `options.findUserById(userId)`로 사용자를 조회할 수 있을 때 `setAuthCookies()`로 두 token을 갱신합니다. 갱신 중 발생한 예상하지 못한 DB 오류는 원본 그대로 reject되어 공통 에러 핸들러에 도달해야 합니다. `options.secure`는 갱신 쿠키의 Secure 설정에 전달합니다.
+2단계에서는 Access Token과 Refresh Token의 payload에 `userId`만 넣고 유효기간을 각각 15분과 7일로 설정합니다. 두 쿠키의 이름은 각각 `accessToken`, `refreshToken`을 사용하고, 쿠키의 `maxAge`도 token과 같은 15분과 7일로 맞춥니다. `comparePassword()`의 bcrypt 오류를 `false`로 바꾸는 catch와 `verifyToken()`의 JWT 오류를 `null`로 바꾸는 catch는 각 유틸리티가 정한 의미 있는 경계이므로 유지합니다. 유효한 Access Token은 Refresh Token이 없어도 정상 통과합니다. 만료까지 5분 미만이고 Refresh Token도 있을 때만 Refresh Token을 검증하며, 두 token의 `userId`가 같고 `options.findUserById(userId)`로 사용자를 조회할 수 있을 때 `setAuthCookies()`로 두 token을 갱신합니다. 이때 Refresh Token이 유효하지 않거나 만료됐거나 두 token의 `userId`가 다르면 현재 Access Token의 인증은 유지하고 갱신만 생략합니다. 갱신 중 발생한 예상하지 못한 DB 오류는 원본 그대로 reject되어 공통 에러 핸들러에 도달해야 합니다. `options.secure`는 갱신 쿠키의 Secure 설정에 전달하며 `false`와 `true`를 그대로 보존합니다.
 
 ## 실행 진입점
 

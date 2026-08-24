@@ -48,18 +48,10 @@ export function generateRefreshToken(user, refreshSecret, expiresIn = '7d') {
   });
 }
 
-export function generateTokens(user, secrets, expiresIn = {}) {
+export function generateTokens(user, secrets) {
   return {
-    accessToken: generateAccessToken(
-      user,
-      secrets.access,
-      expiresIn.access ?? '15m',
-    ),
-    refreshToken: generateRefreshToken(
-      user,
-      secrets.refresh,
-      expiresIn.refresh ?? '7d',
-    ),
+    accessToken: generateAccessToken(user, secrets.access),
+    refreshToken: generateRefreshToken(user, secrets.refresh),
   };
 }
 
