@@ -1,29 +1,38 @@
-export class HttpError extends Error {
-  constructor(status, message) {
-    super(message);
+export class HttpException extends Error {
+  statusCode;
+
+  constructor(statusCode, description, details = null) {
+    super(description);
     this.name = this.constructor.name;
-    this.status = status;
+    this.statusCode = statusCode;
+    this.details = details;
   }
 }
 
-export class BadRequestError extends HttpError {
-  constructor(message) {
-    super(400, message);
+export class BadRequestException extends HttpException {
+  constructor(description = 'BAD_REQUEST', details = null) {
+    super(400, description, details);
   }
 }
 
-export class NotFoundError extends HttpError {
-  constructor(message) {
-    super(404, message);
+export class ConflictException extends HttpException {
+  constructor(description = 'CONFLICT') {
+    super(409, description);
+  }
+}
+
+export class NotFoundException extends HttpException {
+  constructor(description = 'NOT_FOUND') {
+    super(404, description);
   }
 }
 
 export function validateIdParam(name, label) {
-  return (req, res, next) => {
+  return (req, _res, next) => {
     const id = Number(req.params[name]);
     if (!Number.isInteger(id) || id < 1) {
       return next(
-        new BadRequestError(`${label} ID must be a positive integer`),
+        new BadRequestException(`${label} ID must be a positive integer`),
       );
     }
     req.params[name] = id;
@@ -31,21 +40,12 @@ export function validateIdParam(name, label) {
   };
 }
 
-export function notFoundHandler(_req, _res, next) {
-  return next(new NotFoundError('Not found'));
-}
-
-export function errorHandler(error, _req, res, _next) {
-  if (error instanceof HttpError) {
-    return res.status(error.status).json({ message: error.message });
+export function mapPrismaError(error) {
+  if (error?.code === 'P2002') {
+    return new ConflictException();
   }
-  const clientStatus = error.status ?? error.statusCode;
-  if (
-    Number.isInteger(clientStatus) &&
-    clientStatus >= 400 &&
-    clientStatus < 500
-  ) {
-    return res.status(clientStatus).json({ message: 'Bad request' });
+  if (error?.code === 'P2025') {
+    return new NotFoundException();
   }
-  return res.status(500).json({ message: 'Internal server error' });
+  return error;
 }

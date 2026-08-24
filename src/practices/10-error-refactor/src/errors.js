@@ -1,13 +1,36 @@
-export class HttpError extends Error {}
+export class HttpException extends Error {
+  statusCode;
+
+  constructor(statusCode, description, details = null) {
+    super(description);
+    this.name = this.constructor.name;
+    this.statusCode = statusCode;
+    this.details = details;
+  }
+}
+
+export class BadRequestException extends HttpException {
+  constructor(description = 'BAD_REQUEST', details = null) {
+    super(400, description, details);
+  }
+}
+
+export class ConflictException extends HttpException {
+  constructor(description = 'CONFLICT') {
+    super(409, description);
+  }
+}
+
+export class NotFoundException extends HttpException {
+  constructor(description = 'NOT_FOUND') {
+    super(404, description);
+  }
+}
 
 export function validateIdParam(_name, _label) {
   return (_req, _res, next) => next();
 }
 
-export function notFoundHandler(_req, _res, next) {
-  return next();
-}
-
-export function errorHandler(_error, _req, res, _next) {
-  return res.status(500).json({ message: 'Internal server error' });
+export function mapPrismaError(error) {
+  return error;
 }

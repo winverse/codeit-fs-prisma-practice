@@ -32,6 +32,6 @@ npm test
 | 트랜잭션                 | `src/practices/07-transactions`           | `npm run check:07` |
 | 인증 유틸리티와 미들웨어 | `src/practices/08-auth`                   | `npm run check:08` |
 | 유효성 검사              | `src/practices/09-validation`             | `npm run check:09` |
-| 오류와 ID 검증           | `src/practices/10-error-refactor`         | `npm run check:10` |
+| Prisma 오류와 ID 검증    | `src/practices/10-error-refactor`         | `npm run check:10` |
 
 모든 문제 파일은 `npm test`, 모든 정답 계약은 `npm run test:answers`로 확인할 수 있습니다. 정답은 직접 구현을 마친 뒤에만 각 실습 루트의 `answers/`에서 비교하세요. 기본 실행과 문제 테스트는 정답 파일을 불러오지 않습니다.

@@ -4,5 +4,21 @@
     { "name": "postId", "label": "게시글" }
   ],
   "valid": ["1", "42"],
-  "invalid": ["0", "-1", "abc", "1.5"]
+  "invalid": ["0", "-1", "abc", "1.5"],
+  "prismaErrors": [
+    {
+      "code": "P2002",
+      "exception": "ConflictException",
+      "statusCode": 409
+    },
+    {
+      "code": "P2025",
+      "exception": "NotFoundException",
+      "statusCode": 404
+    }
+  ],
+  "unknownError": {
+    "code": "P2003",
+    "message": "Foreign key constraint failed"
+  }
 }

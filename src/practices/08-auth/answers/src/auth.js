@@ -5,6 +5,23 @@ const ACCESS_MAX_AGE = 15 * 60 * 1000;
 const REFRESH_MAX_AGE = 7 * 24 * 60 * 60 * 1000;
 const REFRESH_BEFORE_SECONDS = 5 * 60;
 
+export class HttpException extends Error {
+  statusCode;
+
+  constructor(statusCode, description, details = null) {
+    super(description);
+    this.name = this.constructor.name;
+    this.statusCode = statusCode;
+    this.details = details;
+  }
+}
+
+export class UnauthorizedException extends HttpException {
+  constructor(description = 'Unauthorized') {
+    super(401, description);
+  }
+}
+
 export function hashPassword(password) {
   return bcrypt.hash(password, 10);
 }
@@ -83,40 +100,36 @@ export function authenticate(secrets, { findUserById, secure = false } = {}) {
   }
 
   return async (req, res, next) => {
-    try {
-      const { accessToken, refreshToken } = req.cookies ?? {};
-      if (!accessToken) {
-        return res.status(401).json({ message: 'Access token is required' });
-      }
+    const { accessToken, refreshToken } = req.cookies ?? {};
+    if (!accessToken) {
+      throw new UnauthorizedException('Access token is required');
+    }
 
-      const accessPayload = verifyToken(accessToken, 'access', secrets);
-      if (!accessPayload) {
-        return res.status(401).json({ message: 'Invalid access token' });
-      }
+    const accessPayload = verifyToken(accessToken, 'access', secrets);
+    if (!accessPayload) {
+      throw new UnauthorizedException('Invalid access token');
+    }
 
-      const user = await findUserById(accessPayload.userId);
-      if (!user) {
-        return res.status(401).json({ message: 'User not found' });
-      }
-      req.user = toPublicUser(user);
+    const user = await findUserById(accessPayload.userId);
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+    req.user = toPublicUser(user);
 
-      const expiresIn = accessPayload.exp - Math.floor(Date.now() / 1000);
-      if (expiresIn > 0 && expiresIn < REFRESH_BEFORE_SECONDS && refreshToken) {
-        const refreshPayload = verifyToken(refreshToken, 'refresh', secrets);
-        if (refreshPayload?.userId === accessPayload.userId) {
-          const refreshedUser = await findUserById(refreshPayload.userId);
-          if (refreshedUser) {
-            setAuthCookies(res, generateTokens(refreshedUser, secrets), {
-              secure,
-            });
-          }
+    const expiresIn = accessPayload.exp - Math.floor(Date.now() / 1000);
+    if (expiresIn > 0 && expiresIn < REFRESH_BEFORE_SECONDS && refreshToken) {
+      const refreshPayload = verifyToken(refreshToken, 'refresh', secrets);
+      if (refreshPayload?.userId === accessPayload.userId) {
+        const refreshedUser = await findUserById(refreshPayload.userId);
+        if (refreshedUser) {
+          setAuthCookies(res, generateTokens(refreshedUser, secrets), {
+            secure,
+          });
         }
       }
-
-      return next();
-    } catch {
-      return res.status(500).json({ message: 'Authentication failed' });
     }
+
+    return next();
   };
 }
 

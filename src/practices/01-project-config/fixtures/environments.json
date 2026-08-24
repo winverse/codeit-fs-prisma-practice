@@ -7,6 +7,10 @@
     {
       "PORT": "5001",
       "DATABASE_URL": "postgres://practice@127.0.0.1:5432/practice_db"
+    },
+    {
+      "PORT": "4000",
+      "DATABASE_URL": "  postgresql://practice@127.0.0.1:5432/practice_db  "
     }
   ],
   "invalid": [
@@ -14,6 +18,9 @@
     { "PORT": "999", "DATABASE_URL": "postgresql://practice/db" },
     { "PORT": "3000.5", "DATABASE_URL": "postgresql://practice/db" },
     { "PORT": "65536", "DATABASE_URL": "postgresql://practice/db" },
+    { "PORT": "3000" },
+    { "PORT": "3000", "DATABASE_URL": "not-a-url" },
+    { "PORT": "3000", "DATABASE_URL": "postgresql://[invalid" },
     { "PORT": "3000", "DATABASE_URL": "mysql://practice" },
     { "PORT": "3000", "DATABASE_URL": "https://example.com/practice" }
   ]

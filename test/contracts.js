@@ -113,7 +113,7 @@ export function registerContracts(candidates) {
     for (const valid of fixture.valid) {
       assert.deepEqual(candidates.config.parseConfig(valid), {
         port: Number(valid.PORT),
-        databaseUrl: valid.DATABASE_URL,
+        databaseUrl: valid.DATABASE_URL.trim(),
       });
     }
     for (const invalid of fixture.invalid) {
@@ -438,6 +438,13 @@ export function registerContracts(candidates) {
       await candidates.auth.comparePassword(fixture.wrongPassword, stored),
       false,
     );
+    assert.equal(
+      await candidates.auth.comparePassword(
+        fixture.password,
+        'not-a-bcrypt-hash',
+      ),
+      false,
+    );
 
     const tokens = candidates.auth.generateTokens(
       fixture.user,
@@ -566,7 +573,7 @@ export function registerContracts(candidates) {
     assert.equal(fixture.user.password, 'must-not-leak');
 
     const databaseUser = { ...fixture.user, name: 'Ada from database' };
-    const runAuthentication = async ({
+    const runAuthentication = ({
       accessToken,
       refreshToken,
       findUserById = async (userId) =>
@@ -582,11 +589,15 @@ export function registerContracts(candidates) {
       const response = {
         statusCode: 200,
         body: null,
+        statusCalls: 0,
+        jsonCalls: 0,
         status(code) {
+          this.statusCalls += 1;
           this.statusCode = code;
           return this;
         },
         json(body) {
+          this.jsonCalls += 1;
           this.body = body;
           return this;
         },
@@ -595,75 +606,171 @@ export function registerContracts(candidates) {
           return this;
         },
       };
-      await candidates.auth.authenticate(fixture.secrets, {
+      const middleware = candidates.auth.authenticate(fixture.secrets, {
         secure: fixture.cookie.secure,
         async findUserById(userId) {
           lookups.push(userId);
           return findUserById(userId);
         },
-      })(request, response, () => {
-        nextCalled = true;
       });
-      return { request, response, nextCalled, cookieCalls, lookups };
+      let nextError;
+      const completion = Promise.resolve().then(() =>
+        middleware(request, response, (error) => {
+          nextCalled = true;
+          nextError = error;
+        }),
+      );
+      return {
+        request,
+        response,
+        get nextCalled() {
+          return nextCalled;
+        },
+        get nextError() {
+          return nextError;
+        },
+        cookieCalls,
+        lookups,
+        completion,
+      };
     };
 
-    const authenticated = await runAuthentication({
+    const authenticated = runAuthentication({
       accessToken: tokens.accessToken,
     });
+    await authenticated.completion;
     assert.equal(authenticated.nextCalled, true);
+    assert.equal(authenticated.nextError, undefined);
     assert.equal(authenticated.request.user.id, fixture.user.id);
     assert.equal(authenticated.request.user.name, databaseUser.name);
     assert.equal('password' in authenticated.request.user, false);
     assert.deepEqual(authenticated.lookups, [fixture.user.id]);
     assert.equal(authenticated.cookieCalls.length, 0);
 
+    const assertUnauthorized = async (execution) => {
+      let captured;
+      await assert.rejects(execution.completion, (error) => {
+        captured = error;
+        return true;
+      });
+      assert.ok(captured instanceof candidates.auth.HttpException);
+      assert.ok(captured instanceof candidates.auth.UnauthorizedException);
+      assert.equal(captured.statusCode, 401);
+      assert.equal(typeof captured.message, 'string');
+      assert.equal(execution.nextCalled, false);
+      assert.equal(execution.response.statusCalls, 0);
+      assert.equal(execution.response.jsonCalls, 0);
+      assert.equal(execution.response.statusCode, 200);
+      assert.equal(execution.response.body, null);
+    };
+
     for (const rejectedToken of [
       undefined,
       tamperedAccess,
       expiredTokens.accessToken,
     ]) {
-      const rejected = await runAuthentication({ accessToken: rejectedToken });
-      assert.equal(rejected.nextCalled, false);
-      assert.equal(rejected.response.statusCode, 401);
-      assert.equal(typeof rejected.response.body.message, 'string');
+      await assertUnauthorized(
+        runAuthentication({ accessToken: rejectedToken }),
+      );
     }
 
-    const missingUser = await runAuthentication({
+    await assertUnauthorized(
+      runAuthentication({
+        accessToken: tokens.accessToken,
+        findUserById: async () => null,
+      }),
+    );
+
+    const databaseError = new Error('Fixture database failure');
+    const unexpectedDatabaseFailure = runAuthentication({
       accessToken: tokens.accessToken,
-      findUserById: async () => null,
+      findUserById: async () => {
+        throw databaseError;
+      },
     });
-    assert.equal(missingUser.nextCalled, false);
-    assert.equal(missingUser.response.statusCode, 401);
+    let forwardedDatabaseError;
+    await assert.rejects(unexpectedDatabaseFailure.completion, (error) => {
+      forwardedDatabaseError = error;
+      return true;
+    });
+    assert.equal(forwardedDatabaseError, databaseError);
+    assert.equal(unexpectedDatabaseFailure.nextCalled, false);
+    assert.equal(unexpectedDatabaseFailure.response.statusCalls, 0);
+    assert.equal(unexpectedDatabaseFailure.response.jsonCalls, 0);
 
     const nearExpiry = candidates.auth.generateTokens(
       fixture.user,
       fixture.secrets,
       { access: '4m', refresh: '2h' },
     );
-    const withoutRefresh = await runAuthentication({
+    const withoutRefresh = runAuthentication({
       accessToken: nearExpiry.accessToken,
     });
+    await withoutRefresh.completion;
     assert.equal(withoutRefresh.nextCalled, true);
     assert.equal(withoutRefresh.cookieCalls.length, 0);
     assert.deepEqual(withoutRefresh.lookups, [fixture.user.id]);
 
-    const refreshed = await runAuthentication({
+    const refreshed = runAuthentication({
       accessToken: nearExpiry.accessToken,
       refreshToken: nearExpiry.refreshToken,
     });
+    await refreshed.completion;
     assert.equal(refreshed.nextCalled, true);
     assert.equal(refreshed.cookieCalls.length, 2);
     assert.deepEqual(refreshed.lookups, [fixture.user.id, fixture.user.id]);
+
+    let missingRefreshUserLookupCount = 0;
+    const missingRefreshUser = runAuthentication({
+      accessToken: nearExpiry.accessToken,
+      refreshToken: nearExpiry.refreshToken,
+      findUserById: async () => {
+        missingRefreshUserLookupCount += 1;
+        return missingRefreshUserLookupCount === 1 ? databaseUser : null;
+      },
+    });
+    await missingRefreshUser.completion;
+    assert.equal(missingRefreshUser.nextCalled, true);
+    assert.equal(missingRefreshUser.cookieCalls.length, 0);
+    assert.deepEqual(missingRefreshUser.lookups, [
+      fixture.user.id,
+      fixture.user.id,
+    ]);
+
+    const refreshDatabaseError = new Error('Fixture refresh database failure');
+    let refreshLookupCount = 0;
+    const unexpectedRefreshDatabaseFailure = runAuthentication({
+      accessToken: nearExpiry.accessToken,
+      refreshToken: nearExpiry.refreshToken,
+      findUserById: async () => {
+        refreshLookupCount += 1;
+        if (refreshLookupCount === 1) return databaseUser;
+        throw refreshDatabaseError;
+      },
+    });
+    let forwardedRefreshDatabaseError;
+    await assert.rejects(
+      unexpectedRefreshDatabaseFailure.completion,
+      (error) => {
+        forwardedRefreshDatabaseError = error;
+        return true;
+      },
+    );
+    assert.equal(forwardedRefreshDatabaseError, refreshDatabaseError);
+    assert.equal(unexpectedRefreshDatabaseFailure.nextCalled, false);
+    assert.equal(unexpectedRefreshDatabaseFailure.response.statusCalls, 0);
+    assert.equal(unexpectedRefreshDatabaseFailure.response.jsonCalls, 0);
 
     const otherUserTokens = candidates.auth.generateTokens(
       { ...fixture.user, id: 2 },
       fixture.secrets,
       { access: '4m', refresh: '2h' },
     );
-    const mismatched = await runAuthentication({
+    const mismatched = runAuthentication({
       accessToken: nearExpiry.accessToken,
       refreshToken: otherUserTokens.refreshToken,
     });
+    await mismatched.completion;
     assert.equal(mismatched.nextCalled, true);
     assert.equal(mismatched.cookieCalls.length, 0);
     assert.deepEqual(mismatched.lookups, [fixture.user.id]);
@@ -755,7 +862,7 @@ export function registerContracts(candidates) {
     assert.deepEqual(signupWithUnknownField.data, fixture.validSignup);
   });
 
-  test('10 커스텀 에러와 검증 리팩터링', () => {
+  test('10 Prisma 오류와 ID 검증', () => {
     const fixture = readJson(candidates.errors.fixture);
     for (const { name, label } of fixture.params) {
       for (const value of fixture.valid) {
@@ -773,62 +880,40 @@ export function registerContracts(candidates) {
         candidates.errors.validateIdParam(name, label)(req, {}, (error) => {
           captured = error;
         });
-        assert.ok(captured instanceof candidates.errors.HttpError);
-        assert.equal(captured.status, 400);
+        assert.ok(captured instanceof candidates.errors.HttpException);
+        assert.ok(captured instanceof candidates.errors.BadRequestException);
+        assert.equal(captured.statusCode, 400);
       }
     }
-    const handleError = (error) => {
-      const response = {
-        statusCode: 200,
-        body: null,
-        status(code) {
-          this.statusCode = code;
-          return this;
-        },
-        json(body) {
-          this.body = body;
-          return this;
-        },
-      };
-      candidates.errors.errorHandler(error, {}, response, () => {});
-      return response;
-    };
 
-    const customResponse = handleError(
-      new candidates.errors.HttpError(404, 'Not found'),
-    );
-    assert.equal(customResponse.statusCode, 404);
-    assert.deepEqual(customResponse.body, { message: 'Not found' });
-
-    let notFoundError;
-    candidates.errors.notFoundHandler({}, {}, (error) => {
-      notFoundError = error;
-    });
-    assert.ok(notFoundError instanceof candidates.errors.HttpError);
-    assert.equal(notFoundError.status, 404);
-    const notFoundResponse = handleError(notFoundError);
-    assert.equal(notFoundResponse.statusCode, 404);
-    assert.deepEqual(notFoundResponse.body, { message: 'Not found' });
-
-    for (const [statusProperty, status] of [
-      ['status', 400],
-      ['statusCode', 413],
-    ]) {
-      const internalMessage = `Internal ${status} details`;
-      const error = new Error(internalMessage);
-      error[statusProperty] = status;
-      const clientResponse = handleError(error);
-      assert.equal(clientResponse.statusCode, status);
-      assert.deepEqual(clientResponse.body, { message: 'Bad request' });
-      assert.notEqual(clientResponse.body.message, internalMessage);
+    for (const expected of fixture.prismaErrors) {
+      const prismaError = Object.assign(new Error(`Prisma ${expected.code}`), {
+        code: expected.code,
+        meta: { internal: 'must not be copied' },
+      });
+      const mapped = candidates.errors.mapPrismaError(prismaError);
+      const ExpectedException = candidates.errors[expected.exception];
+      assert.ok(mapped instanceof candidates.errors.HttpException);
+      assert.ok(mapped instanceof ExpectedException);
+      assert.notEqual(mapped, prismaError);
+      assert.equal(mapped.statusCode, expected.statusCode);
     }
 
-    const internalMessage = 'Database credentials leaked';
-    const unexpectedResponse = handleError(new Error(internalMessage));
-    assert.equal(unexpectedResponse.statusCode, 500);
-    assert.deepEqual(unexpectedResponse.body, {
-      message: 'Internal server error',
-    });
-    assert.notEqual(unexpectedResponse.body.message, internalMessage);
+    const unknownPrismaError = Object.assign(
+      new Error(fixture.unknownError.message),
+      {
+        code: fixture.unknownError.code,
+      },
+    );
+    assert.equal(
+      candidates.errors.mapPrismaError(unknownPrismaError),
+      unknownPrismaError,
+    );
+
+    const unexpectedError = new Error('Unexpected database failure');
+    assert.equal(
+      candidates.errors.mapPrismaError(unexpectedError),
+      unexpectedError,
+    );
   });
 }
