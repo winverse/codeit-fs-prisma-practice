@@ -1,13 +1,10 @@
 import { registerDatabaseContracts } from './database-contracts.js';
-import {
-  assertSafeSeedTarget,
-  seed,
-} from '../../src/practices/03-seeding/src/seed.js';
-import { createUserRepository } from '../../src/practices/04-crud/src/userRepository.js';
-import { createRelationRepository } from '../../src/practices/05-relation-queries/src/relationRepository.js';
-import { createPostRepository } from '../../src/practices/06-advanced-queries/src/postQuery.js';
-import { mapPrismaError } from '../../src/practices/09-error-refactor/src/errors.js';
-import { createPostTransactions } from '../../src/practices/10-transactions/src/postTransactions.js';
+import { seed } from '../../src/practices/02-seeding/src/seed.js';
+import { assertSafeSeedTarget } from '../../src/practices/02-seeding/src/seed-safety.js';
+import { createUserRepository } from '../../src/practices/03-crud/src/userRepository.js';
+import { createRelationRepository } from '../../src/practices/04-relation-queries/src/relationRepository.js';
+import { createPostRepository } from '../../src/practices/05-advanced-queries/src/postQuery.js';
+import { createPostTransactions } from '../../src/practices/08-transactions/src/postTransactions.js';
 
 const practice = (path) =>
   new URL(`../../src/practices/${path}`, import.meta.url);
@@ -16,17 +13,16 @@ registerDatabaseContracts({
   seeding: {
     assertSafeSeedTarget,
     seed,
-    fixture: practice('03-seeding/fixtures/seed.json'),
+    fixture: practice('02-seeding/fixtures/seed.json'),
   },
   crud: {
     createUserRepository,
-    fixture: practice('04-crud/fixtures/users.json'),
+    fixture: practice('03-crud/fixtures/users.json'),
   },
   relations: { createRelationRepository },
   advanced: { createPostRepository },
-  errors: { mapPrismaError },
   transactions: {
     createPostTransactions,
-    fixture: practice('10-transactions/fixtures/operations.json'),
+    fixture: practice('08-transactions/fixtures/operations.json'),
   },
 });

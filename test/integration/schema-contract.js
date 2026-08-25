@@ -9,7 +9,7 @@ import {
 } from '../../src/db/practice-database.js';
 
 export function registerSchemaDatabaseContract(PrismaClient) {
-  test('02 실제 Prisma 모델과 관계', async () => {
+  test('01 실제 Prisma 모델과 관계', async () => {
     const target = assertSafePracticeDatabase();
     const candidate = new PrismaClient({
       adapter: new PrismaPg({ connectionString: target.toString() }),

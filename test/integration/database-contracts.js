@@ -41,7 +41,7 @@ export function registerDatabaseContracts(candidates) {
     await prisma.$disconnect();
   });
 
-  test('03 실제 Prisma 시딩', async () => {
+  test('02 실제 Prisma 시딩', async () => {
     const fixture = readJson(candidates.seeding.fixture);
 
     await candidates.seeding.seed(prisma, {
@@ -73,7 +73,7 @@ export function registerDatabaseContracts(candidates) {
     }
   });
 
-  test('04 실제 Prisma CRUD', async () => {
+  test('03 실제 Prisma CRUD', async () => {
     const fixture = readJson(candidates.crud.fixture);
     const repository = candidates.crud.createUserRepository(prisma);
     const created = await repository.create({
@@ -98,7 +98,7 @@ export function registerDatabaseContracts(candidates) {
     );
   });
 
-  test('05 실제 Prisma 관계 쿼리', async () => {
+  test('04 실제 Prisma 관계 쿼리', async () => {
     const { ada, grace } = await seedRelationData();
     const repository = candidates.relations.createRelationRepository(prisma);
 
@@ -119,7 +119,7 @@ export function registerDatabaseContracts(candidates) {
     );
   });
 
-  test('06 실제 Prisma 필터링·정렬·페이지네이션', async () => {
+  test('05 실제 Prisma 필터링·정렬·페이지네이션', async () => {
     const author = await prisma.user.create({
       data: { email: 'query@practice.test', name: 'Query Author' },
     });
@@ -160,40 +160,7 @@ export function registerDatabaseContracts(candidates) {
     assert.ok(posts.every(({ author: actual }) => actual.id === author.id));
   });
 
-  test('09 실제 Prisma 오류 매핑', async () => {
-    const user = await prisma.user.create({
-      data: { email: 'error@practice.test', name: 'Error User' },
-    });
-
-    let duplicateError;
-    try {
-      await prisma.user.create({
-        data: { email: user.email, name: 'Duplicate' },
-      });
-    } catch (error) {
-      duplicateError = error;
-    }
-    assert.equal(duplicateError?.code, 'P2002');
-    const conflict = candidates.errors.mapPrismaError(duplicateError);
-    assert.equal(conflict.name, 'ConflictException');
-    assert.equal(conflict.statusCode, 409);
-
-    let missingError;
-    try {
-      await prisma.user.update({
-        where: { id: user.id + 1_000_000 },
-        data: { name: 'Missing' },
-      });
-    } catch (error) {
-      missingError = error;
-    }
-    assert.equal(missingError?.code, 'P2025');
-    const notFound = candidates.errors.mapPrismaError(missingError);
-    assert.equal(notFound.name, 'NotFoundException');
-    assert.equal(notFound.statusCode, 404);
-  });
-
-  test('10 실제 Prisma 트랜잭션 롤백', async () => {
+  test('08 실제 Prisma 트랜잭션 롤백', async () => {
     const postAuthor = await prisma.user.create({
       data: { email: 'post-author@practice.test', name: 'Post Author' },
     });

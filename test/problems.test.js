@@ -1,55 +1,51 @@
 import { registerContracts } from './contracts.js';
-import {
-  assertSafeSeedTarget,
-  seed,
-} from '../src/practices/03-seeding/src/seed.js';
-import { createUserRepository } from '../src/practices/04-crud/src/userRepository.js';
-import { createRelationRepository } from '../src/practices/05-relation-queries/src/relationRepository.js';
+import { seed } from '../src/practices/02-seeding/src/seed.js';
+import { assertSafeSeedTarget } from '../src/practices/02-seeding/src/seed-safety.js';
+import { createUserRepository } from '../src/practices/03-crud/src/userRepository.js';
+import { createRelationRepository } from '../src/practices/04-relation-queries/src/relationRepository.js';
 import {
   buildPostQuery,
   createPostRepository,
-} from '../src/practices/06-advanced-queries/src/postQuery.js';
-import * as auth from '../src/practices/07-auth/src/auth.js';
-import * as validation from '../src/practices/08-validation/src/schemas.js';
-import * as errors from '../src/practices/09-error-refactor/src/errors.js';
-import { createPostTransactions } from '../src/practices/10-transactions/src/postTransactions.js';
+} from '../src/practices/05-advanced-queries/src/postQuery.js';
+import * as auth from '../src/practices/06-auth/src/auth.js';
+import { authRouter } from '../src/practices/07-validation/src/auth.routes.js';
+import { errorHandler } from '../src/practices/07-validation/src/error-handler.middleware.js';
+import * as validation from '../src/practices/07-validation/src/schemas.js';
+import { createPostTransactions } from '../src/practices/08-transactions/src/postTransactions.js';
 
 const practice = (path) => new URL(`../src/practices/${path}`, import.meta.url);
 
 registerContracts({
   schema: {
-    schema: practice('02-prisma-model-relations/prisma/schema.prisma'),
-    fixture: practice('02-prisma-model-relations/fixtures/expected.json'),
+    schema: practice('01-prisma-model-relations/prisma/schema.prisma'),
+    fixture: practice('01-prisma-model-relations/fixtures/expected.json'),
   },
   seeding: {
     assertSafeSeedTarget,
     seed,
-    fixture: practice('03-seeding/fixtures/seed.json'),
+    fixture: practice('02-seeding/fixtures/seed.json'),
   },
   crud: {
     createUserRepository,
-    fixture: practice('04-crud/fixtures/users.json'),
+    fixture: practice('03-crud/fixtures/users.json'),
   },
   relations: {
     createRelationRepository,
-    fixture: practice('05-relation-queries/fixtures/expected.json'),
   },
   advanced: {
     buildPostQuery,
     createPostRepository,
-    fixture: practice('06-advanced-queries/fixtures/query.json'),
+    fixture: practice('05-advanced-queries/fixtures/query.json'),
   },
-  auth: { ...auth, fixture: practice('07-auth/fixtures/auth.json') },
+  auth: { ...auth, fixture: practice('06-auth/fixtures/auth.json') },
   validation: {
     ...validation,
-    fixture: practice('08-validation/fixtures/cases.json'),
-  },
-  errors: {
-    ...errors,
-    fixture: practice('09-error-refactor/fixtures/ids.json'),
+    authRouter,
+    errorHandler,
+    fixture: practice('07-validation/fixtures/cases.json'),
   },
   transactions: {
     createPostTransactions,
-    fixture: practice('10-transactions/fixtures/operations.json'),
+    fixture: practice('08-transactions/fixtures/operations.json'),
   },
 });

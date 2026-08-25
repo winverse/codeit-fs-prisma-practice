@@ -1,8 +1,8 @@
 # JavaScript Backend Prisma Practice
 
-`관계형 데이터베이스를 활용한 자바스크립트 서버 만들기` 과정의 Prisma 문제 해결 실습입니다. 한 번 준비한 전용 PostgreSQL 데이터베이스 `prisma_practice_blog`와 공용 Prisma Client를 바탕으로 9개 문제를 연습합니다.
+`관계형 데이터베이스를 활용한 자바스크립트 서버 만들기` 과정의 Prisma 문제 해결 실습입니다. 한 번 준비한 전용 PostgreSQL 데이터베이스 `prisma_practice_blog`와 공용 Prisma Client를 바탕으로 8개 문제를 연습합니다.
 
-DB를 사용하는 실습은 실행할 때마다 `Comment → Post → User` 순서로 practice 데이터만 초기화합니다. 따라서 같은 데이터베이스를 공유하지만 다른 실습의 이전 실행 결과에는 의존하지 않습니다. 인증 유틸리티와 Zod 유효성 검사는 데이터베이스보다 요청 경계가 학습 목표이므로 독립 fixture로 확인합니다.
+DB를 사용하는 실습은 실행할 때마다 `Comment → Post → User` 순서로 practice 데이터만 초기화합니다. 따라서 같은 데이터베이스를 공유하지만 다른 실습의 이전 실행 결과에는 의존하지 않습니다. 인증 유틸리티는 독립 fixture로 확인하고, Zod 유효성 검사는 임시 Express 서버의 실제 HTTP 요청 경계에서 확인합니다.
 
 ## 처음 한 번 준비하기
 
@@ -54,7 +54,7 @@ npm run db:setup
 
 ## 첫 정상 상태
 
-준비가 끝나면 `prisma_practice_blog`에 `User`, `Post`, `Comment` 테이블이 있고 `generated/prisma`에 Client가 생성됩니다. 문제 파일에는 아직 `TODO`가 있으므로 다음 전체 확인은 9개 미완성 문제를 보여 주며 실패하는 것이 정상입니다.
+준비가 끝나면 `prisma_practice_blog`에 `User`, `Post`, `Comment` 테이블이 있고 `generated/prisma`에 Client가 생성됩니다. 문제 파일에는 아직 `TODO`가 있으므로 다음 전체 확인은 8개 미완성 문제를 보여 주며 실패하는 것이 정상입니다.
 
 ```bash
 npm run format:check
@@ -69,15 +69,14 @@ npm test
 
 | 실습                     | 문제 폴더                                 | 확인 방식                   | 확인 명령          |
 | ------------------------ | ----------------------------------------- | --------------------------- | ------------------ |
-| Prisma 모델과 관계       | `src/practices/02-prisma-model-relations` | schema·Client·실제 관계 DB  | `npm run check:02` |
-| 시딩                     | `src/practices/03-seeding`                | 실제 Prisma DB              | `npm run check:03` |
-| CRUD                     | `src/practices/04-crud`                   | 실제 Prisma DB              | `npm run check:04` |
-| 관계 쿼리                | `src/practices/05-relation-queries`       | 실제 Prisma DB              | `npm run check:05` |
-| 고급 쿼리                | `src/practices/06-advanced-queries`       | 실제 Prisma DB              | `npm run check:06` |
-| 인증 유틸리티와 미들웨어 | `src/practices/07-auth`                   | bcrypt·JWT·미들웨어 fixture | `npm run check:07` |
-| 유효성 검사              | `src/practices/08-validation`             | Zod fixture                 | `npm run check:08` |
-| Prisma 오류와 ID 검증    | `src/practices/09-error-refactor`         | 실제 Prisma 오류+미들웨어   | `npm run check:09` |
-| 트랜잭션                 | `src/practices/10-transactions`           | 실제 Prisma DB rollback     | `npm run check:10` |
+| Prisma 모델과 관계       | `src/practices/01-prisma-model-relations` | schema·Client·실제 관계 DB  | `npm run check:01` |
+| 시딩                     | `src/practices/02-seeding`                | 실제 Prisma DB              | `npm run check:02` |
+| CRUD                     | `src/practices/03-crud`                   | 실제 Prisma DB              | `npm run check:03` |
+| 관계 쿼리                | `src/practices/04-relation-queries`       | 실제 Prisma DB              | `npm run check:04` |
+| 고급 쿼리                | `src/practices/05-advanced-queries`       | 실제 Prisma DB              | `npm run check:05` |
+| 인증 유틸리티와 미들웨어 | `src/practices/06-auth`                   | bcrypt·JWT·미들웨어 fixture | `npm run check:06` |
+| 유효성 검사              | `src/practices/07-validation`             | Zod·Express HTTP            | `npm run check:07` |
+| 트랜잭션                 | `src/practices/08-transactions`           | 실제 Prisma DB rollback     | `npm run check:08` |
 
 모든 문제 파일과 실제 DB 결과는 `npm test`, 모든 정답 계약은 `npm run test:answers`로 확인할 수 있습니다. 정답은 직접 구현을 마친 뒤에만 각 실습 루트의 `answers/`에서 비교하세요. 문제 확인은 정답 파일을 불러오지 않습니다.
 

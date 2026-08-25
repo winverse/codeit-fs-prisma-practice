@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import bcrypt from 'bcrypt';
+import express from 'express';
 import jwt from 'jsonwebtoken';
 
 function readText(url) {
@@ -151,7 +152,7 @@ function createTransactionPrisma() {
 }
 
 export function registerContracts(candidates) {
-  test('02 Prisma 모델과 관계', () => {
+  test('01 Prisma 모델과 관계', () => {
     const source = readText(candidates.schema.schema);
     const fixture = readJson(candidates.schema.fixture);
     const compactSource = compactPrisma(source);
@@ -164,7 +165,7 @@ export function registerContracts(candidates) {
     }
   });
 
-  test('03 시딩', async () => {
+  test('02 시딩', async () => {
     const fixture = readJson(candidates.seeding.fixture);
     assert.equal(fixture.users.length, 5);
     assert.ok(fixture.users.every(({ posts }) => posts.length >= 1));
@@ -376,7 +377,7 @@ export function registerContracts(candidates) {
     );
   });
 
-  test('04 CRUD', async () => {
+  test('03 CRUD', async () => {
     const fixture = readJson(candidates.crud.fixture);
     const { calls, delegate } = createRecordingDelegate([
       'create',
@@ -421,7 +422,7 @@ export function registerContracts(candidates) {
     }
   });
 
-  test('05 관계 쿼리', async () => {
+  test('04 관계 쿼리', async () => {
     const users = createRecordingDelegate(['findMany']);
     const posts = createRecordingDelegate(['findMany']);
     const repository = candidates.relations.createRelationRepository({
@@ -492,7 +493,7 @@ export function registerContracts(candidates) {
     assert.deepEqual(postsResult, posts.calls[0].result);
   });
 
-  test('06 고급 쿼리', async () => {
+  test('05 고급 쿼리', async () => {
     const fixture = readJson(candidates.advanced.fixture);
     const query = candidates.advanced.buildPostQuery(fixture.input);
     assert.deepEqual(query, fixture.expected);
@@ -554,12 +555,14 @@ export function registerContracts(candidates) {
       { limit: '101' },
       { limit: 'abc' },
       { published: 'yes' },
+      { published: true },
+      { published: false },
     ]) {
       assert.throws(() => candidates.advanced.buildPostQuery(invalid));
     }
   });
 
-  test('07 인증 유틸리티와 미들웨어', async () => {
+  test('06 인증 유틸리티와 미들웨어', async () => {
     const fixture = readJson(candidates.auth.fixture);
     const packageJson = readJson(new URL('../package.json', import.meta.url));
     assert.equal(packageJson.dependencies.bcrypt, '6.0.0');
@@ -822,6 +825,18 @@ export function registerContracts(candidates) {
           options: { ...call.options, secure: false },
         })),
       ),
+    );
+
+    assert.throws(
+      () => candidates.auth.authenticate(fixture.secrets),
+      TypeError,
+    );
+    assert.throws(
+      () =>
+        candidates.auth.authenticate(fixture.secrets, {
+          findUserById: 'not-a-function',
+        }),
+      TypeError,
     );
 
     const databaseUser = { ...fixture.user, name: 'Ada from database' };
@@ -1096,7 +1111,7 @@ export function registerContracts(candidates) {
     assert.deepEqual(mismatched.lookups, []);
   });
 
-  test('08 유효성 검사', () => {
+  test('07 유효성 검사', async () => {
     const fixture = readJson(candidates.validation.fixture);
     assert.equal(
       candidates.validation.signupSchema.safeParse(fixture.validSignup).success,
@@ -1216,64 +1231,80 @@ export function registerContracts(candidates) {
     });
     assert.equal(loginWithUnknownField.success, true);
     assert.deepEqual(loginWithUnknownField.data, fixture.validLogin);
-  });
 
-  test('09 Prisma 오류와 ID 검증', () => {
-    const fixture = readJson(candidates.errors.fixture);
-    for (const { name, label } of fixture.params) {
-      for (const value of fixture.valid) {
-        const req = { params: { [name]: value } };
-        let nextValue;
-        candidates.errors.validateIdParam(name, label)(req, {}, (error) => {
-          nextValue = error ?? null;
-        });
-        assert.equal(nextValue, null);
-        assert.equal(req.params[name], Number(value));
-      }
-      for (const value of fixture.invalid) {
-        const req = { params: { [name]: value } };
-        let captured;
-        candidates.errors.validateIdParam(name, label)(req, {}, (error) => {
-          captured = error;
-        });
-        assert.ok(captured instanceof candidates.errors.HttpException);
-        assert.ok(captured instanceof candidates.errors.BadRequestException);
-        assert.equal(captured.statusCode, 400);
-      }
-    }
+    const app = express();
+    app.use(express.json());
+    app.use('/api/auth', candidates.validation.authRouter);
+    app.use(candidates.validation.errorHandler);
 
-    for (const expected of fixture.prismaErrors) {
-      const prismaError = Object.assign(new Error(`Prisma ${expected.code}`), {
-        code: expected.code,
-        meta: { internal: 'must not be copied' },
+    const server = await new Promise((resolve) => {
+      const current = app.listen(0, '127.0.0.1', () => resolve(current));
+    });
+    const address = server.address();
+    assert.equal(typeof address, 'object');
+    assert.ok(address);
+    const baseUrl = `http://127.0.0.1:${address.port}/api/auth`;
+    const post = async (path, body) => {
+      const response = await globalThis.fetch(`${baseUrl}${path}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(body),
       });
-      const mapped = candidates.errors.mapPrismaError(prismaError);
-      const ExpectedException = candidates.errors[expected.exception];
-      assert.ok(mapped instanceof candidates.errors.HttpException);
-      assert.ok(mapped instanceof ExpectedException);
-      assert.notEqual(mapped, prismaError);
-      assert.equal(mapped.statusCode, expected.statusCode);
+      return { response, body: await response.json() };
+    };
+
+    try {
+      const signup = await post('/signup', {
+        ...fixture.validSignup,
+        role: 'admin',
+      });
+      assert.equal(signup.response.status, 201);
+      assert.deepEqual(signup.body, {
+        email: fixture.validSignup.email,
+        name: fixture.validSignup.name,
+      });
+
+      const signupWithoutNameResponse = await post(
+        '/signup',
+        signupWithoutName,
+      );
+      assert.equal(signupWithoutNameResponse.response.status, 201);
+      assert.deepEqual(signupWithoutNameResponse.body, {
+        email: signupWithoutName.email,
+      });
+
+      for (const invalid of fixture.invalidSignup) {
+        const result = await post('/signup', invalid);
+        assert.equal(result.response.status, 400);
+        assert.equal(result.body.success, false);
+        assert.equal(result.body.message, 'Validation failed');
+        assert.equal(typeof result.body.details, 'object');
+        assert.deepEqual(result.body.formErrors, []);
+      }
+
+      const login = await post('/login', {
+        ...fixture.validLogin,
+        role: 'admin',
+      });
+      assert.equal(login.response.status, 200);
+      assert.deepEqual(login.body, { email: fixture.validLogin.email });
+
+      for (const invalid of fixture.invalidLogin) {
+        const result = await post('/login', invalid);
+        assert.equal(result.response.status, 400);
+        assert.equal(result.body.success, false);
+        assert.equal(result.body.message, 'Validation failed');
+        assert.equal(typeof result.body.details, 'object');
+        assert.deepEqual(result.body.formErrors, []);
+      }
+    } finally {
+      await new Promise((resolve, reject) => {
+        server.close((error) => (error ? reject(error) : resolve()));
+      });
     }
-
-    const unknownPrismaError = Object.assign(
-      new Error(fixture.unknownError.message),
-      {
-        code: fixture.unknownError.code,
-      },
-    );
-    assert.equal(
-      candidates.errors.mapPrismaError(unknownPrismaError),
-      unknownPrismaError,
-    );
-
-    const unexpectedError = new Error('Unexpected database failure');
-    assert.equal(
-      candidates.errors.mapPrismaError(unexpectedError),
-      unexpectedError,
-    );
   });
 
-  test('10 트랜잭션', async () => {
+  test('08 트랜잭션', async () => {
     const fixture = readJson(candidates.transactions.fixture);
     const prisma = createTransactionPrisma();
     const service = candidates.transactions.createPostTransactions(prisma);
