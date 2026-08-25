@@ -4,6 +4,8 @@
 
 본문과 같은 `bcrypt` 6.0.0과 `jsonwebtoken` 9.0.3으로 인증을 두 단계로 구현합니다. 먼저 비밀번호 해시·비교와 Access Token 검증, payload의 `userId`로 만드는 `req.user`를 완성합니다. 이 흐름이 동작한 뒤 Refresh Token과 두 인증 쿠키, 만료 임박 갱신을 추가합니다. 시작 파일에는 인증 함수의 TODO와 함께 선수 과정에서 완성한 `HttpException`·`UnauthorizedException`이 제공됩니다. 공통 예외 기반 코드는 다시 구현하거나 수정하지 않습니다.
 
+이 실습은 Prisma 조회보다 bcrypt·JWT·쿠키와 인증 미들웨어의 요청 경계가 목표입니다. 유효한 Access Token에서 DB를 조회하지 않는 계약도 확인해야 하므로 실제 practice DB 대신 주입형 사용자 조회 함수와 fixture를 사용합니다.
+
 ## 수정 파일과 fixture
 
 - 수정: `src/auth.js`

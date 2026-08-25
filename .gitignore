@@ -1,5 +1,8 @@
 node_modules/
 coverage/
+env/*
+!env/.env.example
+generated/
 *.log
 *.db
 *.db-journal

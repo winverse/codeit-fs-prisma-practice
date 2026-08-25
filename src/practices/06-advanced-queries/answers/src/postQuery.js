@@ -38,3 +38,14 @@ export function buildPostQuery(input) {
     take: limit,
   };
 }
+
+export function createPostRepository(prisma) {
+  return {
+    findAllPosts(input) {
+      return prisma.post.findMany({
+        ...buildPostQuery(input),
+        include: { author: true },
+      });
+    },
+  };
+}

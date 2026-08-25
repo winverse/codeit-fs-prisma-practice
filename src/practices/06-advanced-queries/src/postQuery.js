@@ -35,3 +35,13 @@ export function buildPostQuery(input) {
     // TODO 8: limit을 take로 추가하세요.
   };
 }
+
+export function createPostRepository(prisma) {
+  return {
+    findAllPosts(input) {
+      // TODO 9: buildPostQuery(input)의 반환값을 펼치고 author 관계를 include에 추가한 뒤,
+      // prisma.post.findMany()를 한 번 호출하세요. 호출 결과를 그대로 반환하세요.
+      throw new Error('TODO 9: findAllPosts()를 구현하세요.');
+    },
+  };
+}

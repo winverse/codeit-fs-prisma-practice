@@ -178,9 +178,9 @@ export function registerContracts(candidates) {
       true,
     );
     for (const localUrl of [
-      `postgresql://localhost/${fixture.databaseName}`,
-      `postgres://127.0.0.1/${fixture.databaseName}`,
-      `postgresql://[::1]/${fixture.databaseName}`,
+      `postgresql://localhost:5432/${fixture.databaseName}`,
+      `postgres://127.0.0.1:5432/${fixture.databaseName}`,
+      `postgresql://[::1]:5432/${fixture.databaseName}`,
     ]) {
       assert.equal(
         candidates.seeding.assertSafeSeedTarget(
@@ -194,7 +194,7 @@ export function registerContracts(candidates) {
     }
     assert.throws(() =>
       candidates.seeding.assertSafeSeedTarget(
-        'postgresql://database.example/prisma_blog',
+        `postgresql://database.example:5432/${fixture.databaseName}`,
         fixture.resetConfirmation,
         fixture.databaseName,
         fixture.nodeEnv,
@@ -212,12 +212,33 @@ export function registerContracts(candidates) {
     }
     assert.throws(() =>
       candidates.seeding.assertSafeSeedTarget(
-        'postgresql://127.0.0.1/production',
+        'postgresql://127.0.0.1:5432/production',
         fixture.resetConfirmation,
         fixture.databaseName,
         fixture.nodeEnv,
       ),
     );
+    assert.throws(() =>
+      candidates.seeding.assertSafeSeedTarget(
+        'postgresql://127.0.0.1:5432/production',
+        '--allow-reset=production',
+        'production',
+        fixture.nodeEnv,
+      ),
+    );
+    for (const unsafeUrl of [
+      `postgresql://127.0.0.1:6543/${fixture.databaseName}`,
+      `postgresql://127.0.0.1:5432/${fixture.databaseName}?host=example.com`,
+    ]) {
+      assert.throws(() =>
+        candidates.seeding.assertSafeSeedTarget(
+          unsafeUrl,
+          fixture.resetConfirmation,
+          fixture.databaseName,
+          fixture.nodeEnv,
+        ),
+      );
+    }
     assert.throws(() =>
       candidates.seeding.assertSafeSeedTarget(
         fixture.databaseUrl,
@@ -471,10 +492,19 @@ export function registerContracts(candidates) {
     assert.deepEqual(postsResult, posts.calls[0].result);
   });
 
-  test('06 고급 쿼리', () => {
+  test('06 고급 쿼리', async () => {
     const fixture = readJson(candidates.advanced.fixture);
     const query = candidates.advanced.buildPostQuery(fixture.input);
     assert.deepEqual(query, fixture.expected);
+    const posts = createRecordingDelegate(['findMany']);
+    const repository = candidates.advanced.createPostRepository({
+      post: posts.delegate,
+    });
+    const result = await repository.findAllPosts(fixture.input);
+    assert.equal(posts.calls.length, 1);
+    assert.deepEqual(posts.calls[0].args, fixture.findManyArgs);
+    assert.deepEqual(result, posts.calls[0].result);
+
     const assertUnfilteredQuery = (actual, { skip, take }) => {
       const { where, ...queryWithoutWhere } = actual;
       assert.ok(

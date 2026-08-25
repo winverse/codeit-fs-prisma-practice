@@ -5,7 +5,10 @@ import {
 } from '../src/practices/03-seeding/src/seed.js';
 import { createUserRepository } from '../src/practices/04-crud/src/userRepository.js';
 import { createRelationRepository } from '../src/practices/05-relation-queries/src/relationRepository.js';
-import { buildPostQuery } from '../src/practices/06-advanced-queries/src/postQuery.js';
+import {
+  buildPostQuery,
+  createPostRepository,
+} from '../src/practices/06-advanced-queries/src/postQuery.js';
 import * as auth from '../src/practices/07-auth/src/auth.js';
 import * as validation from '../src/practices/08-validation/src/schemas.js';
 import * as errors from '../src/practices/09-error-refactor/src/errors.js';
@@ -33,6 +36,7 @@ registerContracts({
   },
   advanced: {
     buildPostQuery,
+    createPostRepository,
     fixture: practice('06-advanced-queries/fixtures/query.json'),
   },
   auth: { ...auth, fixture: practice('07-auth/fixtures/auth.json') },

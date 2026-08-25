@@ -1,3 +1,5 @@
+import { PRACTICE_DATABASE_NAME } from '#db/practice-database.js';
+
 export function assertSafeSeedTarget(
   databaseUrl,
   confirmation,
@@ -21,9 +23,12 @@ export function assertSafeSeedTarget(
 
   if (
     nodeEnv !== 'development' ||
+    databaseName !== PRACTICE_DATABASE_NAME ||
     !postgresProtocol ||
     !localHost ||
-    actualDatabase !== databaseName ||
+    target.port !== '5432' ||
+    target.search !== '' ||
+    actualDatabase !== PRACTICE_DATABASE_NAME ||
     !confirmed
   ) {
     throw new Error('Refusing to reset a database outside the practice target');

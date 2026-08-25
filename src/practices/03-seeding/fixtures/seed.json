@@ -1,7 +1,7 @@
 {
-  "databaseName": "prisma_blog",
-  "databaseUrl": "postgresql://127.0.0.1:5432/prisma_blog",
-  "resetConfirmation": "--allow-reset=prisma_blog",
+  "databaseName": "prisma_practice_blog",
+  "databaseUrl": "postgresql://127.0.0.1:5432/prisma_practice_blog",
+  "resetConfirmation": "--allow-reset=prisma_practice_blog",
   "nodeEnv": "development",
   "users": [
     {
