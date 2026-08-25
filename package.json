@@ -7,9 +7,8 @@
     "#db/*": "./src/db/*"
   },
   "scripts": {
-    "db:create": "node --env-file=./env/.env.development scripts/create-practice-database.js",
     "db:reset": "node --env-file=./env/.env.development scripts/reset-practice-database.js",
-    "db:setup": "npm run db:create && npm run prisma:migrate && npm run prisma:generate",
+    "db:setup": "npm run prisma:migrate && npm run prisma:generate",
     "prisma:generate": "dotenv -e ./env/.env.development -- prisma generate",
     "prisma:generate:practice02": "dotenv -e ./env/.env.development -- prisma generate --schema src/practices/02-prisma-model-relations/prisma/schema.prisma",
     "prisma:generate:answer02": "dotenv -e ./env/.env.development -- prisma generate --schema src/practices/02-prisma-model-relations/answers/prisma/schema.prisma",

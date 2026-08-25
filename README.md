@@ -12,6 +12,22 @@ DB를 사용하는 실습은 실행할 때마다 `Comment → Post → User` 순
 npm install
 ```
 
+practice 전용 데이터베이스 `prisma_practice_blog`를 PostgreSQL에 만듭니다. 이 작업은 저장소를 처음 준비할 때 한 번만 수행하며, 이미 같은 이름의 practice DB가 있다면 건너뜁니다.
+
+Windows에서는 SQL Shell(psql)을 열고 다음 SQL을 실행합니다.
+
+```sql
+CREATE DATABASE prisma_practice_blog;
+\l
+\q
+```
+
+macOS와 Linux에서는 터미널에서 같은 데이터베이스를 만들 수 있습니다.
+
+```bash
+psql -c 'CREATE DATABASE prisma_practice_blog;'
+```
+
 `env/.env.example`을 복사해 Git이 추적하지 않는 `env/.env.development`를 만듭니다.
 
 ```bash
@@ -22,15 +38,19 @@ cp env/.env.example env/.env.development
 Copy-Item env/.env.example env/.env.development
 ```
 
-`env/.env.development`의 `<username>`과 `<password>`를 실제 로컬 PostgreSQL 계정 값으로 바꿉니다. 비밀번호가 없는 Postgres.app 기본 서버는 비밀번호 부분을 생략할 수 있습니다. 데이터베이스 이름은 안전 검사를 위해 반드시 `prisma_practice_blog`로 유지합니다.
+`env/.env.development`의 `DATABASE_URL`에서 `<username>`과 `<password>`를 실제 로컬 PostgreSQL 계정 값으로 바꿉니다. 비밀번호가 없는 Postgres.app 기본 서버는 비밀번호 부분을 생략할 수 있습니다. 호스트·포트·데이터베이스 이름은 안전 검사를 위해 `localhost:5432/prisma_practice_blog`로 유지합니다.
 
-다음 명령은 로컬 `prisma_practice_blog`가 없으면 생성하고, 제공된 migration을 적용한 뒤 Prisma Client를 생성합니다.
+```text
+DATABASE_URL="postgresql://<username>:<password>@localhost:5432/prisma_practice_blog"
+```
+
+다음 명령은 앞에서 만든 `prisma_practice_blog`에 제공된 migration을 적용한 뒤 Prisma Client를 생성합니다.
 
 ```bash
 npm run db:setup
 ```
 
-현재 PostgreSQL 계정에 데이터베이스 생성 권한이 없으면 SQL Shell이나 `psql`에서 `CREATE DATABASE prisma_practice_blog;`를 먼저 실행한 뒤 `npm run db:setup`을 다시 실행합니다. 실제 계정 정보가 들어 있는 `env/.env.development`는 Git에 추가하지 않습니다.
+실제 계정 정보가 들어 있는 `env/.env.development`는 Git에 추가하지 않습니다.
 
 ## 첫 정상 상태
 

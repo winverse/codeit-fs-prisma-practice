@@ -2,6 +2,8 @@
 
 ## 문제와 시작 상태
 
+이 저장소를 처음 사용한다면 프로젝트 루트 `README.md`의 순서대로 practice 전용 데이터베이스 생성, `env/.env.development`의 `DATABASE_URL` 설정, `npm run db:setup`을 먼저 완료하세요.
+
 `prisma-client` generator와 PostgreSQL datasource를 유지하면서 `User`와 `Post` 모델의 1:N 관계, 고유 이메일, 선택 필드, 외래 키, 삭제 동작, 생성·수정 시각을 schema로 작성합니다. 시작 schema에는 generator·datasource와 `TODO 1`부터 `TODO 8`까지의 구현 안내만 있습니다. 다음 순서대로 `prisma/schema.prisma`을 완성하세요.
 
 이 실습의 문제 schema는 프로젝트 실행용 공용 schema와 분리되어 있습니다. `check:02`는 학생이 작성한 문제 schema를 Prisma CLI로 검증하고 해당 schema만으로 Client를 생성한 뒤, 실제 `prisma_practice_blog`에서 User–Post 생성·관계 조회·작성자 삭제 시 cascade까지 확인합니다.
