@@ -1,5 +1,4 @@
 import { registerContracts } from './contracts.js';
-import { parseConfig } from '../src/practices/01-project-config/src/config.js';
 import {
   assertSafeSeedTarget,
   seed,
@@ -15,10 +14,6 @@ import { createPostTransactions } from '../src/practices/10-transactions/src/pos
 const practice = (path) => new URL(`../src/practices/${path}`, import.meta.url);
 
 registerContracts({
-  config: {
-    parseConfig,
-    fixture: practice('01-project-config/fixtures/environments.json'),
-  },
   schema: {
     schema: practice('02-prisma-model-relations/prisma/schema.prisma'),
     fixture: practice('02-prisma-model-relations/fixtures/expected.json'),

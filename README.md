@@ -1,6 +1,6 @@
 # JavaScript Backend Prisma Practice
 
-`관계형 데이터베이스를 활용한 자바스크립트 서버 만들기` 과정의 Prisma 활용 독립 문제 해결 실습입니다. 10개 문제를 각각 별도 시작 상태에서 연습합니다.
+`관계형 데이터베이스를 활용한 자바스크립트 서버 만들기` 과정의 Prisma 활용 독립 문제 해결 실습입니다. 9개 문제를 각각 별도 시작 상태에서 연습합니다.
 
 ## 첫 정상 상태
 
@@ -15,7 +15,7 @@ npm run format:check
 npm test
 ```
 
-마지막 `npm test`가 10개 문제의 미완성 조건을 보여 주며 실패하면 정상입니다.
+마지막 `npm test`가 9개 문제의 미완성 조건을 보여 주며 실패하면 정상입니다.
 
 ## 독립 진행 방식
 
@@ -25,7 +25,6 @@ npm test
 
 | 실습                     | 문제 폴더                                 | 확인 명령          |
 | ------------------------ | ----------------------------------------- | ------------------ |
-| 환경 변수 검증           | `src/practices/01-project-config`         | `npm run check:01` |
 | Prisma 모델과 관계       | `src/practices/02-prisma-model-relations` | `npm run check:02` |
 | 시딩                     | `src/practices/03-seeding`                | `npm run check:03` |
 | CRUD                     | `src/practices/04-crud`                   | `npm run check:04` |

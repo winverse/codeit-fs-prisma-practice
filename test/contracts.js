@@ -151,19 +151,6 @@ function createTransactionPrisma() {
 }
 
 export function registerContracts(candidates) {
-  test('01 환경 변수 검증', () => {
-    const fixture = readJson(candidates.config.fixture);
-    for (const valid of fixture.valid) {
-      assert.deepEqual(candidates.config.parseConfig(valid), {
-        port: Number(valid.PORT),
-        databaseUrl: valid.DATABASE_URL.trim(),
-      });
-    }
-    for (const invalid of fixture.invalid) {
-      assert.throws(() => candidates.config.parseConfig(invalid));
-    }
-  });
-
   test('02 Prisma 모델과 관계', () => {
     const source = readText(candidates.schema.schema);
     const fixture = readJson(candidates.schema.fixture);

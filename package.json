@@ -6,7 +6,6 @@
   "scripts": {
     "test": "prisma validate --schema src/practices/02-prisma-model-relations/prisma/schema.prisma && node --test test/problems.test.js",
     "test:answers": "prisma validate --schema src/practices/02-prisma-model-relations/answers/prisma/schema.prisma && node --test scripts/verify-answers.js",
-    "check:01": "node --test --test-name-pattern=\"^01 \" test/problems.test.js",
     "check:02": "prisma validate --schema src/practices/02-prisma-model-relations/prisma/schema.prisma && node --test --test-name-pattern=\"^02 \" test/problems.test.js",
     "check:03": "node --test --test-name-pattern=\"^03 \" test/problems.test.js",
     "check:04": "node --test --test-name-pattern=\"^04 \" test/problems.test.js",
