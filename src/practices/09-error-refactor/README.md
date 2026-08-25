@@ -6,6 +6,14 @@
 
 `HttpException`, `BadRequestException`, `ConflictException`, `NotFoundException`은 선수 과정에서 완성한 공통 코드로 제공됩니다. 이 예외 클래스를 다시 구현하거나 수정하지 않습니다. 공통 `errorHandler`와 404·500 응답은 이 독립 문제의 구현 범위가 아닙니다.
 
+## 작업 순서
+
+1. **TODO 1**: `validateIdParam(name, label)`이 반환한 미들웨어에서 `req.params[name]`을 읽고 `Number()`로 변환한 결과가 양의 정수인지 판별합니다. `userId`나 `postId`를 코드에 직접 쓰지 말고 전달받은 `name`을 계속 사용합니다.
+2. **TODO 2**: `0`, 음수, 소수, 숫자로 바꿀 수 없는 값은 `new BadRequestException(...)`을 만들어 `return next(error)`로 전달합니다. 이 경로에서는 정상 진행을 호출하거나 파라미터를 바꾸지 않습니다.
+3. **TODO 3**: 유효한 경우에만 변환된 숫자를 같은 `req.params[name]`에 저장하고, 오류 인수 없이 `next()`를 한 번 호출합니다.
+4. **TODO 4**: `mapPrismaError(error)`에서 optional chaining으로 Prisma 오류 코드를 안전하게 확인하고, `P2002`일 때만 입력 오류와 다른 새 `ConflictException`을 반환합니다.
+5. **TODO 5**: `P2025`일 때만 새 `NotFoundException`을 반환합니다. 두 코드 이외의 Prisma 오류와 일반 `Error`는 감싸거나 복제하지 말고 받은 `error` 객체를 그대로 반환합니다.
+
 ## 수정 파일과 fixture
 
 - 수정: `src/errors.js`

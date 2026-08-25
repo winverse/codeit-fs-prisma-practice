@@ -7,4 +7,12 @@ datasource db {
   provider = "postgresql"
 }
 
-// TODO: User와 Post의 1:N 관계를 정의하세요.
+// TODO 1: User 모델을 선언하고, 자동 증가하는 Int 기본 키 id를 추가하세요.
+// TODO 2: User에 고유한 email과 선택적인 name 필드를 추가하세요.
+// TODO 3: User에 Post 목록을 나타내는 양방향 관계 필드를 추가하세요.
+// TODO 4: User에 생성 시각과 자동 수정 시각 필드를 추가하세요.
+// TODO 5: Post 모델을 선언하고, 자동 증가하는 Int 기본 키 id와 title을 추가하세요.
+// TODO 6: Post에 선택적인 content와 기본값이 false인 published 필드를 추가하세요.
+// TODO 7: Post에 authorId 외래 키와 User를 참조하는 관계 필드를 추가하고,
+// 작성자 User가 삭제될 때 해당 게시글도 함께 삭제되도록 설정하세요.
+// TODO 8: Post에 생성 시각과 자동 수정 시각 필드를 추가하세요.

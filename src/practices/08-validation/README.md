@@ -9,6 +9,13 @@
 - 수정: `src/schemas.js`
 - 정상·오류 요청: `fixtures/cases.json`
 
+## 작업 순서
+
+1. **TODO 1**: `schemas.js`의 Zod import 아래에 Node.js의 `node:buffer`에서 `Buffer`를 import합니다. 비밀번호의 글자 수가 아니라 UTF-8 바이트 수를 검사할 때 사용합니다.
+2. **TODO 2**: 비밀번호 문자열을 입력받아 `Buffer.byteLength(password, 'utf8')`가 72 이하인지 boolean으로 반환하는 함수 또는 `refine` 콜백을 작성합니다. 회원가입과 로그인에서 같은 기준을 재사용합니다.
+3. **TODO 3**: 회원가입 schema에 `email`, `password`, 선택 `name`을 정의합니다. 이메일은 Zod 이메일 검사, 비밀번호는 문자열·최소 15자·TODO 2의 바이트 검사를 적용합니다. 이름은 값이 제공됐을 때만 문자열 최소 2자를 검사합니다. 알 수 없는 필드는 parse 결과에서 제거되도록 객체 schema 기본 동작을 유지합니다.
+4. **TODO 4**: 로그인 schema에 `email`, `password`를 정의합니다. 이메일은 Zod 이메일 검사, 비밀번호는 문자열·최소 1자·TODO 2의 바이트 검사를 적용합니다. 이 schema도 알 수 없는 필드를 parse 결과에서 제거해야 합니다.
+
 ## 실행 진입점
 
 `npm run check:08`

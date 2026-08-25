@@ -4,6 +4,13 @@
 
 앞 결과가 뒤 작업에 필요한 게시글+첫 댓글 생성을 callback transaction으로 구현합니다. 시작 코드는 두 생성 작업을 트랜잭션 없이 수행합니다.
 
+## 작업 순서
+
+1. **TODO 1**: 시작 코드의 두 생성 작업을 callback 형태의 `return prisma.$transaction(async (tx) => { ... })`로 감쌉니다. callback이 반환한 Promise를 그대로 반환해야 합니다.
+2. **TODO 2**: 감싼 callback 안에서 기존의 루트 `prisma.post.create()`를 `await tx.post.create({ data: post })`로 바꿔 생성된 게시글을 보관합니다. callback 안의 DB 작업에는 루트 `prisma`를 사용하지 않습니다.
+3. **TODO 3**: 기존 댓글 생성도 `await tx.comment.create(...)`로 바꾸고, 댓글 데이터에는 `comment`의 필드와 방금 만든 게시글의 `id`를 `postId`로 넣습니다. 첫 작업의 결과가 두 번째 작업에 연결되는 순서를 유지합니다.
+4. **TODO 4**: 두 생성 작업이 모두 끝난 뒤 생성한 게시글을 반환합니다. 댓글 생성 오류를 catch해서 성공값으로 바꾸거나 callback 밖에서 실행하지 마세요. 오류가 callback 밖으로 전파되어 `$transaction()`이 앞선 게시글 생성을 롤백해야 합니다.
+
 ## 수정 파일과 fixture
 
 - 수정: `src/postTransactions.js`
